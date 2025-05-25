@@ -116,11 +116,24 @@ def index():
             'is_completed': note.is_completed
         } for note in notes
     ]
+    # Fetch categories and convert to JSON-serializable format
     categories = Category.query.filter_by(user_id=current_user.id).all()
+    categories_data = [
+        {'id': category.id, 'name': category.name, 'color': category.color or '#ffffff'}
+        for category in categories
+    ]
     now = datetime.now()
-    return render_template('index.html', notes=notes, notes_data=notes_data, search_query=search_query,
-                         categories=categories, selected_category=category_id, show_completed=show_completed,
-                         show_incomplete=show_incomplete, now=now)
+    return render_template(
+        'index.html',
+        notes=notes,
+        notes_data=notes_data,
+        search_query=search_query,
+        categories=categories_data,  # Use serialized data
+        selected_category=category_id,
+        show_completed=show_completed,
+        show_incomplete=show_incomplete,
+        now=now
+    )
 
 @app.route('/add_note', methods=['GET', 'POST'])
 @login_required
@@ -178,7 +191,7 @@ def add_note():
                 content=content,
                 category_id=category_id,
                 user_id=current_user.id,
-                due_date=due_date_utc,
+                due_date=due_date_obj,
                 share_id=str(uuid4()) if share else None,
                 is_completed=is_completed
             )
@@ -303,27 +316,50 @@ def import_note():
     if request.method == 'POST':
         file = request.files['file']
         if file and file.filename.endswith('.txt'):
-            content = file.read().decode('utf-8')
-            lines = content.split('\n', 2)
-            title = lines[0].replace('Title: ', '') if lines[0].startswith('Title: ') else 'Imported Note'
-            note_content = lines[2].split('Category: ')[0] if len(lines) > 2 else content
-            category_name = lines[2].split('Category: ')[1] if len(lines) > 2 and 'Category: ' in lines[2] else None
-            category = Category.query.filter_by(name=category_name, user_id=current_user.id).first()
-            category_id = category.id if category else None
-            note = Note(title=title, content=note_content, user_id=current_user.id, category_id=category_id)
-            db.session.add(note)
-            db.session.commit()
-            flash('Note imported successfully!', 'success')
+            try:
+                content = file.read().decode('utf-8')
+                lines = content.split('\n', 2)
+                title = lines[0].replace('Title: ', '') if lines[0].startswith('Title: ') else 'Imported Note'
+                note_content = lines[2].split('Category: ')[0] if len(lines) > 2 else content
+                category_name = lines[2].split('Category: ')[1].strip() if len(lines) > 2 and 'Category: ' in lines[2] else None
+                category = Category.query.filter_by(name=category_name, user_id=current_user.id).first()
+                category_id = category.id if category else None
+                note = Note(title=title, content=note_content, user_id=current_user.id, category_id=category_id)
+                db.session.add(note)
+                db.session.commit()
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({
+                        'status': 'success',
+                        'message': 'Note imported successfully!',
+                        'note': {
+                            'id': note.id,
+                            'title': note.title,
+                            'content': note.content,
+                            'category_id': note.category_id,
+                            'category_name': category_name,
+                            'is_completed': note.is_completed
+                        }
+                    })
+                flash('Note imported successfully!', 'success')
+            except Exception as e:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': f'Failed to import note: {str(e)}'}), 400
+                flash(f'Failed to import note: {str(e)}', 'danger')
         else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'Please upload a .txt file!'}), 400
             flash('Please upload a .txt file!', 'danger')
-        return redirect(url_for('index'))
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return redirect(url_for('index'))
     return render_template('import_note.html')
 
 @app.route('/calendar')
 @login_required
 def calendar():
     categories = Category.query.filter_by(user_id=current_user.id).all()
-    return render_template('calendar.html', categories=categories)
+    # Serialize categories for JavaScript
+    categories_data = [{'id': c.id, 'name': c.name, 'color': c.color or '#ffffff'} for c in categories]
+    return render_template('calendar.html', categories=categories, categories_data=categories_data)
 
 @app.route('/notes')
 @login_required
@@ -345,6 +381,11 @@ def get_notes():
 @login_required
 def manage_categories():
     categories = Category.query.filter_by(user_id=current_user.id).all()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'status': 'success',
+            'categories': [{'id': c.id, 'name': c.name, 'color': c.color or '#ffffff'} for c in categories]
+        })
     return render_template('manage_categories.html', categories=categories)
 
 @app.route('/add_category', methods=['GET', 'POST'])
@@ -354,13 +395,21 @@ def add_category():
         name = request.form['name']
         color = request.form['color']
         if Category.query.filter_by(name=name, user_id=current_user.id).first():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'Category already exists!'}), 400
             flash('Category already exists!', 'danger')
         else:
             category = Category(name=name, user_id=current_user.id, color=color)
             db.session.add(category)
             db.session.commit()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'success',
+                    'category': {'id': category.id, 'name': category.name, 'color': category.color or '#ffffff'}
+                })
             flash('Category added successfully!', 'success')
-        return redirect(url_for('manage_categories'))
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return redirect(url_for('manage_categories'))
     return render_template('add_category.html')
 
 @app.route('/edit_category/<int:id>', methods=['GET', 'POST'])
@@ -368,32 +417,49 @@ def add_category():
 def edit_category(id):
     category = Category.query.get_or_404(id)
     if category.user_id != current_user.id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Unauthorized access!'}), 403
         flash('Unauthorized access!', 'danger')
         return redirect(url_for('manage_categories'))
     if request.method == 'POST':
         name = request.form['name']
         color = request.form['color']
         if Category.query.filter_by(name=name, user_id=current_user.id).first() and name != category.name:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'Category name already exists!'}), 400
             flash('Category name already exists!', 'danger')
         else:
             category.name = name
             category.color = color
             db.session.commit()
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'success',
+                    'category': {'id': category.id, 'name': category.name, 'color': category.color or '#ffffff'}
+                })
             flash('Category updated successfully!', 'success')
-        return redirect(url_for('manage_categories'))
+        if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+            return redirect(url_for('manage_categories'))
     return render_template('edit_category.html', category=category)
 
-@app.route('/delete_category/<int:id>')
+@app.route('/delete_category/<int:id>', methods=['POST'])
 @login_required
 def delete_category(id):
     category = Category.query.get_or_404(id)
     if category.user_id == current_user.id:
-        # Set category_id to null for all notes in this category
         Note.query.filter_by(category_id=id).update({'category_id': None})
         db.session.delete(category)
         db.session.commit()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'success'})
         flash('Category deleted successfully!', 'success')
-    return redirect(url_for('manage_categories'))
+    else:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Unauthorized access!'}), 403
+        flash('Unauthorized access!', 'danger')
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return redirect(url_for('manage_categories'))
+    return jsonify({'status': 'success'})
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
