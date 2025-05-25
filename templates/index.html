@@ -90,6 +90,10 @@
         .form-switch .form-check-input {
             cursor: pointer;
         }
+        /* Ensure button and search input align properly */
+        .input-group .btn {
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -125,14 +129,11 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h2>Your Notes</h2>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMemoModal" title="Add New Note">
-                <i class="bi bi-plus-circle"></i>
-            </button>
-        </div>
         <form class="mb-3" id="searchForm">
             <div class="input-group mb-2">
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#addMemoModal" title="Add New Note">
+                    <i class="bi bi-plus-circle"></i>
+                </button>
                 <input type="text" class="form-control" id="searchInput" name="search" placeholder="Search notes..." value="{{ search_query }}">
             </div>
             <div class="row">
