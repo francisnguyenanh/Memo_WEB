@@ -212,11 +212,15 @@ def add_note():
     categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('add_note.html', categories=categories)
 
+
+
 @app.route('/edit_note/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_note(id):
     note = Note.query.get_or_404(id)
     if note.user_id != current_user.id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'error', 'message': 'Unauthorized access.'}), 403
         flash('Unauthorized access.', 'danger')
         return redirect(url_for('index'))
 
@@ -226,14 +230,25 @@ def edit_note(id):
         category_id = request.form.get('category_id')
         due_date = request.form.get('due_date')
         share = 'share' in request.form
-        is_completed = 'is_completed' in request.form
+
+        # Handle is_completed explicitly
+        is_completed = False
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            is_completed = request.form.get('is_completed') == '1'
+        else:
+            is_completed = 'is_completed' in request.form
 
         # Validate category
         categories = Category.query.filter_by(user_id=current_user.id).all()
         if not categories:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify(
+                    {'status': 'error', 'message': 'No categories available. Please create a category first.'}), 400
             flash('No categories available. Please create a category first.', 'danger')
             return redirect(url_for('add_category'))
         if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': 'Please select a valid category.'}), 400
             flash('Please select a valid category.', 'danger')
             return render_template('edit_note.html', note=note, categories=categories)
 
@@ -244,8 +259,28 @@ def edit_note(id):
         note.share_id = str(uuid.uuid4()) if share and not note.share_id else note.share_id if share else None
         note.is_completed = is_completed
         db.session.commit()
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'status': 'success', 'message': 'Note updated successfully!'})
+
         flash('Note updated successfully!', 'success')
         return redirect(url_for('index'))
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'status': 'success',
+            'note': {
+                'id': note.id,
+                'title': note.title,
+                'content': note.content,
+                'category_id': note.category_id,
+                'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
+                'share_id': note.share_id,
+                'is_completed': bool(note.is_completed)  # Ensure boolean value
+            },
+            'categories': [{'id': c.id, 'name': c.name} for c in
+                           Category.query.filter_by(user_id=current_user.id).all()]
+        })
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('edit_note.html', note=note, categories=categories)

@@ -248,6 +248,60 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- New Edit Memo Modal -->
+        {% if categories %}
+        <div class="modal fade" id="editMemoModal" tabindex="-1" aria-labelledby="editMemoModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editMemoModalLabel">Edit Memo</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editMemoForm" method="POST">
+                            <input type="hidden" id="editMemoId" name="id">
+                            <div class="mb-3">
+                                <label for="editMemoTitle" class="form-label">Title</label>
+                                <input type="text" class="form-control" id="editMemoTitle" name="title" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editMemoContent" class="form-label">Content</label>
+                                <textarea class="form-control" id="editMemoContent" name="content" rows="4" required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="editMemoDueDate" class="form-label">Due Date (JST)</label>
+                                <input type="datetime-local" class="form-control" id="editMemoDueDate" name="due_date" step="60">
+                            </div>
+                            <div class="mb-3">
+                                <label for="editMemoCategory" class="form-label">Category <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editMemoCategory" name="category_id" required>
+                                    {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="editMemoShare" name="share">
+                                    <label class="form-check-label" for="editMemoShare">Enable public sharing</label>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="editMemoCompleted" name="is_completed">
+                                    <label class="form-check-label" for="editMemoCompleted">Completed</label>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Update Memo</button>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
     <!-- Manage Categories Modal -->
     <div class="modal fade" id="manageCategoriesModal" tabindex="-1" aria-labelledby="manageCategoriesModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -851,6 +905,136 @@
             });
         }
         adjustTextColors();
+
+        const editMemoModal = new bootstrap.Modal(document.getElementById('editMemoModal'));
+        const editMemoForm = document.getElementById('editMemoForm');
+
+        // Function to populate edit modal
+        async function openEditMemoModal(noteId) {
+        try {
+            const response = await fetch(`/edit_note/${noteId}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                const note = data.note;
+                document.getElementById('editMemoId').value = note.id;
+                document.getElementById('editMemoTitle').value = note.title;
+                document.getElementById('editMemoContent').value = note.content;
+                document.getElementById('editMemoDueDate').value = note.due_date || '';
+                document.getElementById('editMemoCategory').value = note.category_id;
+                document.getElementById('editMemoShare').checked = !!note.share_id;
+                document.getElementById('editMemoCompleted').checked = note.is_completed === true; // Ensure correct boolean handling
+                // Update category options
+                const categorySelect = document.getElementById('editMemoCategory');
+                categorySelect.innerHTML = '';
+                data.categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category.id;
+                    option.textContent = category.name;
+                    if (category.id == note.category_id) {
+                        option.selected = true;
+                    }
+                    categorySelect.appendChild(option);
+                });
+                editMemoModal.show();
+            } else {
+                showFlashMessage('danger', data.message || 'Failed to load note data.');
+            }
+        } catch (error) {
+            console.error('Error loading note:', error);
+            showFlashMessage('danger', 'Error loading note.');
+        }
+    }
+
+        // Handle edit memo form submission
+        editMemoForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        // Explicitly set is_completed to '1' or '0'
+        formData.set('is_completed', document.getElementById('editMemoCompleted').checked ? '1' : '0');
+        formData.set('share', document.getElementById('editMemoShare').checked ? '1' : '0');
+        const noteId = formData.get('id');
+        try {
+            const response = await fetch(`/edit_note/${noteId}`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                editMemoModal.hide();
+                updateSearch();
+                showFlashMessage('success', data.message);
+            } else {
+                showFlashMessage('danger', data.message || 'Failed to update note.');
+            }
+        } catch (error) {
+            console.error('Error updating note:', error);
+            showFlashMessage('danger', 'Error updating note.');
+        }
+    });
+
+        // Modify edit button click handler
+        function attachEditButtonListeners() {
+            document.querySelectorAll('.btn .bi-pencil').forEach(button => {
+                button.parentElement.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const noteId = button.parentElement.href.match(/\/edit_note\/(\d+)/)[1];
+                    openEditMemoModal(noteId);
+                });
+            });
+        }
+
+        // Call this function after notes are loaded or updated
+        function updateNotesEventListeners() {
+            attachToggleSwitchListeners();
+            attachEditButtonListeners();
+            adjustTextColors();
+        }
+
+        // Update existing updateSearch function to call updateNotesEventListeners
+        async function updateSearch() {
+            const search = searchInput.value.toLowerCase();
+            const category_id = categorySelect.value;
+            const show_completed = showCompleted.checked ? 1 : 0;
+            const show_incomplete = showIncomplete.checked ? 1 : 0;
+            const params = new URLSearchParams({
+                search,
+                category_id,
+                show_completed,
+                show_incomplete
+            });
+            try {
+                const response = await fetch(`/?${params.toString()}`);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newNotesContainer = doc.getElementById('notesContainer');
+                notesContainer.innerHTML = newNotesContainer.innerHTML;
+                // Update notes array with fresh data
+                const newNotesData = doc.querySelector('script').textContent.match(/let notes = (\[.*?\]);/s);
+                if (newNotesData) {
+                    notes = JSON.parse(newNotesData[1]);
+                }
+                // Update categories array with fresh data
+                const newCategoriesData = doc.querySelector('script').textContent.match(/let categories = (\[.*?\]);/s);
+                if (newCategoriesData) {
+                    categories = JSON.parse(newCategoriesData[1]);
+                    updateCategorySelect();
+                }
+                updateNotesEventListeners();
+                updateReminders();
+                updateDueDateDisplays();
+                toggleRemindersVisibility();
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        // Initialize event listeners
+        updateNotesEventListeners();
+
     </script>
 </body>
 </html>
