@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memo App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f8f9fa;
+            --primary-color: #0d6efd;
+        }
+        [data-theme="dark"] {
+            --bg-color: #343a40;
+            --text-color: #ffffff;
+            --card-bg: #495057;
+            --primary-color: #6c757d;
+        }
+        [data-theme="blue"] {
+            --bg-color: #e6f0fa;
+            --text-color: #003087;
+            --card-bg: #d6e4f0;
+            --primary-color: #004aad;
+        }
+        [data-theme="green"] {
+            --bg-color: #e6f4ea;
+            --text-color: #004d00;
+            --card-bg: #d4edda;
+            --primary-color: #006400;
+        }
+        [data-theme="purple"] {
+            --bg-color: #f3e5f5;
+            --text-color: #4a0072;
+            --card-bg: #e1bee7;
+            --primary-color: #6a1b9a;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        .card {
+            background-color: var(--card-bg);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .category-card {
+            background-color: var(--category-color);
+            color: var(--text-color);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light" style="background-color: var(--card-bg);">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Memo App</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-nav">
+                    <a class="nav-link" href="{{ url_for('add_note') }}">Add Note</a>
+                    <a class="nav-link" href="{{ url_for('add_category') }}">Add Category</a>
+                    <a class="nav-link" href="{{ url_for('import_note') }}">Import Note</a>
+                    <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <h2>Your Notes</h2>
+        <form class="mb-3" id="searchForm">
+            <div class="input-group mb-2">
+                <input type="text" class="form-control" id="searchInput" name="search" placeholder="Search notes..." value="{{ search_query }}">
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <select class="form-select mb-2" name="category_id" id="categorySelect">
+                        <option value="">All Categories</option>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="showCompleted" name="show_completed" value="1" {% if show_completed %}checked{% endif %}>
+                        <label class="form-check-label" for="showCompleted">Show only completed notes</label>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <div id="reminders" class="mb-3"></div>
+        <div class="row">
+            {% for note in notes %}
+                <div class="col-12 col-md-6 col-lg-4 mb-3">
+                    <div class="card category-card" style="background-color: {{ note.category.color if note.category and note.category.color else '#ffffff' }};">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input complete-checkbox" type="checkbox" data-note-id="{{ note.id }}" {% if note.is_completed %}checked{% endif %}>
+                                </div>
+                                <h5 class="card-title">{{ note.title }}</h5>
+                            </div>
+                            <p class="card-text">{{ note.content|truncate(100) }}</p>
+                            <p class="card-text"><small class="text-muted">Tags: {{ note.tags or 'None' }}</small></p>
+                            <p class="card-text"><small class="text-muted">Category: {{ note.category.name if note.category else 'None' }}</small></p>
+                            {% if note.due_date and not note.is_completed %}
+                                <p class="card-text"><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
+                            {% endif %}
+                            {% if note.share_id %}
+                                <p class="card-text"><small class="text-muted">Share: <a href="{{ url_for('share_note', share_id=note.share_id) }}" target="_blank">Link</a></small></p>
+                            {% endif %}
+                            <div class="d-flex justify-content-end">
+                                <a href="{{ url_for('edit_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('delete_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-trash"></i></a>
+                                <a href="{{ url_for('export_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-file-earmark-text"></i></a>
+                                <a href="{{ url_for('export_pdf', id=note.id) }}" class="btn btn-sm"><i class="bi bi-file-earmark-pdf"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <h3>Categories</h3>
+        <div class="row">
+            {% for category in categories %}
+                <div class="col-12 col-md-4 mb-3">
+                    <div class="card" style="background-color: {{ category.color or '#ffffff' }};">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <span>{{ category.name }}</span>
+                            <div>
+                                <a href="{{ url_for('edit_category', id=category.id) }}" class="btn btn-sm me-1"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('delete_category', id=category.id) }}" class="btn btn-sm"><i class="bi bi-trash"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ url_for('change_password') }}">
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Change Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Password</button>
+                    </form>
+                    <hr>
+                    <div class="mb-3">
+                        <label for="themeSelect" class="form-label">Theme</label>
+                        <select class="form-select" id="themeSelect">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                            <option value="purple">Purple</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/offline.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js')
+                .then(reg => console.log('Service Worker registered'))
+                .catch(err => console.error('Service Worker registration failed:', err));
+        }
+
+        // Theme switching
+        const themeSelect = document.getElementById('themeSelect');
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        themeSelect.value = currentTheme;
+        themeSelect.addEventListener('change', () => {
+            const theme = themeSelect.value;
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+        });
+
+        // Real-time search
+        const searchInput = document.getElementById('searchInput');
+        const categorySelect = document.getElementById('categorySelect');
+        const showCompleted = document.getElementById('showCompleted');
+        function updateSearch() {
+            const params = new URLSearchParams({
+                search: searchInput.value,
+                category_id: categorySelect.value,
+                show_completed: showCompleted.checked ? 1 : 0
+            });
+            window.location.href = '/?' + params.toString();
+        }
+        searchInput.addEventListener('input', updateSearch);
+        categorySelect.addEventListener('change', updateSearch);
+        showCompleted.addEventListener('change', updateSearch);
+
+        // Reminders
+        const notes = {{ notes_data | tojson }};
+        const now = new Date();
+        const reminders = notes
+            .filter(note => note.due_date && new Date(note.due_date) <= now && !note.is_completed)
+            .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+        const remindersDiv = document.getElementById('reminders');
+        reminders.forEach(note => {
+            const reminder = document.createElement('div');
+            reminder.className = 'alert alert-warning';
+            reminder.textContent = `Reminder: "${note.title}" is due at ${new Date(note.due_date).toLocaleString()}`;
+            remindersDiv.appendChild(reminder);
+        });
+
+        // Toggle complete
+        document.querySelectorAll('.complete-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', async () => {
+                const noteId = checkbox.dataset.noteId;
+                const response = await fetch(`/toggle_complete/${noteId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.ok) {
+                    window.location.reload();
+                }
+            });
+        });
+
+        // Adjust text color based on background
+        document.querySelectorAll('.category-card').forEach(card => {
+            const bgColor = card.style.backgroundColor;
+            if (bgColor) {
+                const rgb = bgColor.match(/\d+/g).map(Number);
+                const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+                card.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
+            }
+        });
+    </script>
+</body>
+</html>
