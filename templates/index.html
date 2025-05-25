@@ -206,6 +206,20 @@
         .reminder-item:hover {
             background-color: #ffca2c; /* Slightly darker yellow for regular hover */
         }
+
+        #viewMemoModal .modal-body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        #viewMemoModal #viewMemoTitle {
+            font-family: 'Kosugi Maru', sans-serif;
+            font-size: 1.5rem;
+        }
+        #viewMemoModal #viewMemoContent {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 5px;
+            min-height: 100px;
+        }
     </style>
 </head>
 <body>
@@ -299,7 +313,7 @@
                                 <p class="card-text"><small class="text-muted">Share: <a href="{{ url_for('share_note', share_id=note.share_id) }}" target="_blank">Link</a></small></p>
                             {% endif %}
                             <div class="d-flex justify-content-end">
-                                <a href="{{ url_for('edit_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-pencil"></i></a>
+
                                 <a href="{{ url_for('delete_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-trash"></i></a>
                                 <a href="{{ url_for('export_note', id=note.id) }}" class="btn btn-sm me-1"><i class="bi bi-file-earmark-text"></i></a>
                                 <a href="{{ url_for('export_pdf', id=note.id) }}" class="btn btn-sm"><i class="bi bi-file-earmark-pdf"></i></a>
@@ -361,6 +375,32 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- View Memo Modal -->
+    <div class="modal fade" id="viewMemoModal" tabindex="-1" aria-labelledby="viewMemoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewMemoModalLabel">View Memo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 id="viewMemoTitle" class="mb-3"></h6>
+                    <p id="viewMemoContent" style="white-space: pre-wrap;"></p>
+                    <p id="viewMemoDueDate" class="text-muted"></p>
+                    <p id="viewMemoCategory" class="text-muted"></p>
+                    <p id="viewMemoShare" class="text-muted"></p>
+                    <p id="viewMemoCompleted" class="text-muted"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="editFromViewButton">Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Edit Memo Modal -->
     {% if categories %}
     <div class="modal fade" id="editMemoModal" tabindex="-1" aria-labelledby="editMemoModalLabel" aria-hidden="true">
@@ -1111,9 +1151,62 @@
             });
         }
 
+        // Initialize view memo modal
+        const viewMemoModal = new bootstrap.Modal(document.getElementById('viewMemoModal'));
+
+        // Function to open view memo modal
+        async function openViewMemoModal(noteId) {
+            try {
+                const response = await fetch(`/edit_note/${noteId}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const note = data.note;
+                    document.getElementById('viewMemoTitle').textContent = note.title;
+                    document.getElementById('viewMemoContent').textContent = note.content;
+                    document.getElementById('viewMemoDueDate').textContent = note.due_date ? `Due: ${formatDateJST(note.due_date)}` : '';
+                    document.getElementById('viewMemoCategory').textContent = `Category: ${note.category ? note.category.name : 'None'}`;
+                    document.getElementById('viewMemoShare').innerHTML = note.share_id ? `Share: <a href="{{ url_for('share_note', share_id='') }}${note.share_id}" target="_blank">Link</a>` : '';
+                    document.getElementById('viewMemoCompleted').textContent = `Status: ${note.is_completed ? 'Completed' : 'Incomplete'}`;
+
+                    // Set up edit button in view modal
+                    const editFromViewButton = document.getElementById('editFromViewButton');
+                    editFromViewButton.onclick = () => {
+                        viewMemoModal.hide();
+                        openEditMemoModal(noteId);
+                    };
+
+                    viewMemoModal.show();
+                } else {
+                    showFlashMessage('danger', data.message || 'Failed to load note data.');
+                }
+            } catch (error) {
+                console.error('Error loading note:', error);
+                showFlashMessage('danger', 'Error loading note.');
+            }
+        }
+
+        // Update event listeners for notes
         function updateNotesEventListeners() {
             attachToggleSwitchListeners();
+            // Remove existing edit button listeners to avoid duplicates
+            document.querySelectorAll('.btn .bi-pencil').forEach(button => {
+                button.parentElement.removeEventListener('click', openEditMemoModal);
+            });
+            // Attach edit button listeners
             attachEditButtonListeners();
+            // Add click event to cards for viewing
+            document.querySelectorAll('.category-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // Prevent triggering view modal when clicking buttons or toggle switch
+                    if (e.target.closest('.btn, .form-check-input')) {
+                        return;
+                    }
+                    const noteId = card.dataset.noteId;
+                    openViewMemoModal(noteId);
+                });
+            });
             adjustTextColors();
         }
 
