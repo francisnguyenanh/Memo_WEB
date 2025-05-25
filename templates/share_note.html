@@ -10,8 +10,6 @@
     <div class="container mt-4">
         <h2>{{ note.title }}</h2>
         <p>{{ note.content }}</p>
-        <p><small class="text-muted">Tags: {{ note.tags or 'None' }}</small></p>
-        <p><small class="text-muted">Category: {{ note.category.name if note.category else 'None' }}</small></p>
         {% if note.due_date %}
             <p><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
         {% endif %}
