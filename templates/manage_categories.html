@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Categories</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h2>Manage Categories</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <a href="{{ url_for('add_category') }}" class="btn btn-primary mb-3">Add New Category</a>
+        <div class="row">
+            {% for category in categories %}
+                <div class="col-12 col-md-4 mb-3">
+                    <div class="card" style="background-color: {{ category.color or '#ffffff' }};">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <span>{{ category.name }}</span>
+                            <div>
+                                <a href="{{ url_for('edit_category', id=category.id) }}" class="btn btn-sm me-1"><i class="bi bi-pencil"></i></a>
+                                <a href="{{ url_for('delete_category', id=category.id) }}" class="btn btn-sm"><i class="bi bi-trash"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Notes</a>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Adjust text color based on background
+        document.querySelectorAll('.card').forEach(card => {
+            const bgColor = card.style.backgroundColor;
+            if (bgColor) {
+                const rgb = bgColor.match(/\d+/g).map(Number);
+                const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+                const textColor = luminance > 0.5 ? '#000000' : '#ffffff';
+                card.style.color = textColor;
+                card.querySelectorAll('.card-body, .card-body a').forEach(el => {
+                    el.style.color = textColor;
+                });
+            }
+        });
+    </script>
+</body>
+</html>

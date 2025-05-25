@@ -9,8 +9,10 @@ from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import uuid
-from datetime import datetime
 import logging
+from datetime import datetime
+from datetime import datetime, timedelta  # Added timedelta
+from uuid import uuid4  # Added uuid4
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -41,7 +43,6 @@ class Note(db.Model):
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
     user_id = db.Column(db.String(80), nullable=False)
-    tags = db.Column(db.String(200), nullable=True)
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'), nullable=True)
     due_date = db.Column(db.DateTime, nullable=True)
     share_id = db.Column(db.String(36), nullable=True)
@@ -76,7 +77,11 @@ with app.app_context():
             f.write(hashed.decode('utf-8'))
 
 # Register font for Vietnamese support
-pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+try:
+    pdfmetrics.registerFont(TTFont('DejaVuSans', 'DejaVuSans.ttf'))
+except Exception as e:
+    app.logger.error(f"Failed to register font: {str(e)}")
+    pdfmetrics.registerFont(TTFont('DejaVuSans', 'Helvetica'))  # Fallback to Helvetica
 
 @app.route('/')
 @login_required
@@ -84,13 +89,16 @@ def index():
     search_query = request.args.get('search', '')
     category_id = request.args.get('category_id', type=int)
     show_completed = request.args.get('show_completed', type=int, default=0)
+    show_incomplete = request.args.get('show_incomplete', type=int, default=0)
     notes_query = Note.query.filter_by(user_id=current_user.id)
     if search_query:
         notes_query = notes_query.filter(Note.title.contains(search_query) | Note.content.contains(search_query))
     if category_id:
         notes_query = notes_query.filter_by(category_id=category_id)
-    if show_completed:
+    if show_completed and not show_incomplete:
         notes_query = notes_query.filter_by(is_completed=True)
+    elif show_incomplete and not show_completed:
+        notes_query = notes_query.filter_by(is_completed=False)
     # Sort by due_date ascending, nulls last
     notes_query = notes_query.order_by(Note.due_date.asc().nulls_last())
     notes = notes_query.all()
@@ -100,7 +108,6 @@ def index():
             'id': note.id,
             'title': note.title,
             'content': note.content,
-            'tags': note.tags,
             'category_id': note.category_id,
             'category_name': note.category.name if note.category else None,
             'category_color': note.category.color if note.category else None,
@@ -110,50 +117,124 @@ def index():
         } for note in notes
     ]
     categories = Category.query.filter_by(user_id=current_user.id).all()
+    now = datetime.now()
     return render_template('index.html', notes=notes, notes_data=notes_data, search_query=search_query,
-                         categories=categories, selected_category=category_id, show_completed=show_completed)
+                         categories=categories, selected_category=category_id, show_completed=show_completed,
+                         show_incomplete=show_incomplete, now=now)
 
-@app.route('/add', methods=['GET', 'POST'])
+@app.route('/add_note', methods=['GET', 'POST'])
 @login_required
 def add_note():
-    categories = Category.query.filter_by(user_id=current_user.id).all()
     if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
-        tags = request.form.get('tags')
-        category_id = request.form.get('category_id', type=int)
-        due_date = request.form.get('due_date')
-        due_date = datetime.strptime(due_date, '%Y-%m-%dT%H:%M') if due_date else None
-        share_id = str(uuid.uuid4()) if request.form.get('share') else None
-        is_completed = bool(request.form.get('is_completed'))
-        note = Note(title=title, content=content, tags=tags, user_id=current_user.id,
-                    category_id=category_id, due_date=due_date, share_id=share_id, is_completed=is_completed)
-        db.session.add(note)
-        db.session.commit()
-        flash('Note added successfully!', 'success')
-        return redirect(url_for('index'))
+        try:
+            title = request.form.get('title')
+            content = request.form.get('content')
+            category_id = request.form.get('category_id')
+            due_date = request.form.get('due_date')
+            share = request.form.get('share') == '1'
+            is_completed = request.form.get('is_completed') == '1'
+
+
+            # Validate required fields
+            if not title:
+                flash('Title is required.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Title is required'}), 400
+                return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+
+            if not content:
+                flash('Content is required.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Content is required'}), 400
+                return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+
+            # Validate category
+            categories = Category.query.filter_by(user_id=current_user.id).all()
+            if not categories:
+                flash('No categories available. Please create a category first.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'No categories available'}), 400
+                return redirect(url_for('add_category'))
+            if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
+                flash('Please select a valid category.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Invalid category'}), 400
+                return render_template('add_note.html', categories=categories)
+
+            # Parse due_date
+            due_date_utc = None
+            if due_date:
+                try:
+                    due_date_obj = datetime.strptime(due_date, '%Y-%m-%dT%H:%M')
+                    due_date_utc = due_date_obj - timedelta(hours=9)  # Convert JST to UTC
+                except ValueError as e:
+                    flash('Invalid due date format.', 'danger')
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return jsonify({'status': 'error', 'message': 'Invalid due date format'}), 400
+                    return render_template('add_note.html', categories=categories)
+
+            note = Note(
+                title=title,
+                content=content,
+                category_id=category_id,
+                user_id=current_user.id,
+                due_date=due_date_utc,
+                share_id=str(uuid4()) if share else None,
+                is_completed=is_completed
+            )
+            db.session.add(note)
+            db.session.commit()
+            flash('Note added successfully!', 'success')
+
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'success'})
+            return redirect(url_for('index'))
+
+        except Exception as e:
+            flash('An error occurred while adding the note.', 'danger')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
+            return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+
+    categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('add_note.html', categories=categories)
 
-@app.route('/edit/<int:id>', methods=['GET', 'POST'])
+@app.route('/edit_note/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_note(id):
     note = Note.query.get_or_404(id)
     if note.user_id != current_user.id:
-        flash('Unauthorized access!', 'danger')
+        flash('Unauthorized access.', 'danger')
         return redirect(url_for('index'))
-    categories = Category.query.filter_by(user_id=current_user.id).all()
+
     if request.method == 'POST':
-        note.title = request.form['title']
-        note.content = request.form['content']
-        note.tags = request.form.get('tags')
-        note.category_id = request.form.get('category_id', type=int)
+        title = request.form.get('title')
+        content = request.form.get('content')
+        category_id = request.form.get('category_id')
         due_date = request.form.get('due_date')
+        share = 'share' in request.form
+        is_completed = 'is_completed' in request.form
+
+        # Validate category
+        categories = Category.query.filter_by(user_id=current_user.id).all()
+        if not categories:
+            flash('No categories available. Please create a category first.', 'danger')
+            return redirect(url_for('add_category'))
+        if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
+            flash('Please select a valid category.', 'danger')
+            return render_template('edit_note.html', note=note, categories=categories)
+
+        note.title = title
+        note.content = content
+        note.category_id = category_id
         note.due_date = datetime.strptime(due_date, '%Y-%m-%dT%H:%M') if due_date else None
-        note.share_id = str(uuid.uuid4()) if request.form.get('share') else note.share_id
-        note.is_completed = bool(request.form.get('is_completed'))
+        note.share_id = str(uuid.uuid4()) if share and not note.share_id else note.share_id if share else None
+        note.is_completed = is_completed
         db.session.commit()
         flash('Note updated successfully!', 'success')
         return redirect(url_for('index'))
+
+    categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('edit_note.html', note=note, categories=categories)
 
 @app.route('/toggle_complete/<int:id>', methods=['POST'])
@@ -183,7 +264,7 @@ def export_note(id):
     if note.user_id != current_user.id:
         flash('Unauthorized access!', 'danger')
         return redirect(url_for('index'))
-    file_content = f"Title: {note.title}\n\n{note.content}\n\nTags: {note.tags or 'None'}\nCategory: {note.category.name if note.category else 'None'}"
+    file_content = f"Title: {note.title}\n\n{note.content}\n\nCategory: {note.category.name if note.category else 'None'}"
     file = BytesIO(file_content.encode('utf-8'))
     return send_file(file, download_name=f"{note.title}.txt", as_attachment=True)
 
@@ -196,14 +277,16 @@ def export_pdf(id):
         return redirect(url_for('index'))
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
-    p.setFont('DejaVuSans', 12)
+    try:
+        p.setFont('DejaVuSans', 12)
+    except:
+        p.setFont('Helvetica', 12)  # Fallback font
     p.drawString(100, 750, note.title)
     y = 700
     for line in note.content.split('\n'):
         p.drawString(100, y, line)
         y -= 20
-    p.drawString(100, y, f"Tags: {note.tags or 'None'}")
-    p.drawString(100, y - 20, f"Category: {note.category.name if note.category else 'None'}")
+    p.drawString(100, y, f"Category: {note.category.name if note.category else 'None'}")
     p.showPage()
     p.save()
     buffer.seek(0)
@@ -223,12 +306,11 @@ def import_note():
             content = file.read().decode('utf-8')
             lines = content.split('\n', 2)
             title = lines[0].replace('Title: ', '') if lines[0].startswith('Title: ') else 'Imported Note'
-            note_content = lines[2].split('Tags: ')[0] if len(lines) > 2 else content
-            tags = lines[2].split('Tags: ')[1].split('\nCategory: ')[0] if len(lines) > 2 and 'Tags: ' in lines[2] else None
+            note_content = lines[2].split('Category: ')[0] if len(lines) > 2 else content
             category_name = lines[2].split('Category: ')[1] if len(lines) > 2 and 'Category: ' in lines[2] else None
             category = Category.query.filter_by(name=category_name, user_id=current_user.id).first()
             category_id = category.id if category else None
-            note = Note(title=title, content=note_content, tags=tags, user_id=current_user.id, category_id=category_id)
+            note = Note(title=title, content=note_content, user_id=current_user.id, category_id=category_id)
             db.session.add(note)
             db.session.commit()
             flash('Note imported successfully!', 'success')
@@ -236,6 +318,34 @@ def import_note():
             flash('Please upload a .txt file!', 'danger')
         return redirect(url_for('index'))
     return render_template('import_note.html')
+
+@app.route('/calendar')
+@login_required
+def calendar():
+    categories = Category.query.filter_by(user_id=current_user.id).all()
+    return render_template('calendar.html', categories=categories)
+
+@app.route('/notes')
+@login_required
+def get_notes():
+    notes = Note.query.filter_by(user_id=current_user.id).all()
+    events = [
+        {
+            'id': note.id,
+            'title': note.title,
+            'start': note.due_date.isoformat() if note.due_date else None,
+            'backgroundColor': note.category.color if note.category and note.category.color else '#ffffff',
+            'is_completed': note.is_completed
+        }
+        for note in notes if note.due_date
+    ]
+    return jsonify(events)
+
+@app.route('/manage_categories')
+@login_required
+def manage_categories():
+    categories = Category.query.filter_by(user_id=current_user.id).all()
+    return render_template('manage_categories.html', categories=categories)
 
 @app.route('/add_category', methods=['GET', 'POST'])
 @login_required
@@ -250,7 +360,7 @@ def add_category():
             db.session.add(category)
             db.session.commit()
             flash('Category added successfully!', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('manage_categories'))
     return render_template('add_category.html')
 
 @app.route('/edit_category/<int:id>', methods=['GET', 'POST'])
@@ -259,7 +369,7 @@ def edit_category(id):
     category = Category.query.get_or_404(id)
     if category.user_id != current_user.id:
         flash('Unauthorized access!', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('manage_categories'))
     if request.method == 'POST':
         name = request.form['name']
         color = request.form['color']
@@ -270,7 +380,7 @@ def edit_category(id):
             category.color = color
             db.session.commit()
             flash('Category updated successfully!', 'success')
-        return redirect(url_for('index'))
+        return redirect(url_for('manage_categories'))
     return render_template('edit_category.html', category=category)
 
 @app.route('/delete_category/<int:id>')
@@ -283,7 +393,7 @@ def delete_category(id):
         db.session.delete(category)
         db.session.commit()
         flash('Category deleted successfully!', 'success')
-    return redirect(url_for('index'))
+    return redirect(url_for('manage_categories'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -326,7 +436,6 @@ def sync_notes():
             if existing_note and existing_note.user_id == current_user.id:
                 existing_note.title = note['title']
                 existing_note.content = note['content']
-                existing_note.tags = note.get('tags')
                 existing_note.category_id = note.get('category_id')
                 due_date = note.get('due_date')
                 existing_note.due_date = datetime.fromisoformat(due_date) if due_date else None
@@ -336,7 +445,6 @@ def sync_notes():
                 new_note = Note(
                     title=note['title'],
                     content=note['content'],
-                    tags=note.get('tags'),
                     user_id=current_user.id,
                     category_id=category.id if category else None,
                     due_date=datetime.fromisoformat(due_date) if (due_date := note.get('due_date')) else None,
@@ -351,7 +459,6 @@ def sync_notes():
                     'id': note.id,
                     'title': note.title,
                     'content': note.content,
-                    'tags': note.tags if note.tags else None,
                     'category_id': note.category_id if note.category_id else None,
                     'due_date': note.due_date.isoformat() if note.due_date else None,
                     'is_completed': note.is_completed

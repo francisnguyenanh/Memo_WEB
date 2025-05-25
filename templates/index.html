@@ -50,7 +50,15 @@
         }
         .category-card {
             background-color: var(--category-color);
-            color: var(--text-color);
+        }
+        .category-card .text-muted, .category-card .text-muted a {
+            color: inherit !important;
+        }
+        .reminder {
+            border: 2px solid red !important;
+        }
+        .form-switch .form-check-input {
+            cursor: pointer;
         }
     </style>
 </head>
@@ -62,13 +70,23 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <div class="navbar-nav">
-                    <a class="nav-link" href="{{ url_for('add_note') }}">Add Note</a>
-                    <a class="nav-link" href="{{ url_for('add_category') }}">Add Category</a>
-                    <a class="nav-link" href="{{ url_for('import_note') }}">Import Note</a>
-                    <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-                    <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
-                </div>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manage_categories') }}">Categories</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('calendar') }}">Calendar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('import_note') }}">Import Note</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
+                    </li>
+                </ul>
             </div>
         </div>
     </nav>
@@ -80,13 +98,18 @@
                 {% endfor %}
             {% endif %}
         {% endwith %}
-        <h2>Your Notes</h2>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Your Notes</h2>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMemoModal" title="Add New Note">
+                <i class="bi bi-plus-circle"></i>
+            </button>
+        </div>
         <form class="mb-3" id="searchForm">
             <div class="input-group mb-2">
                 <input type="text" class="form-control" id="searchInput" name="search" placeholder="Search notes..." value="{{ search_query }}">
             </div>
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <select class="form-select mb-2" name="category_id" id="categorySelect">
                         <option value="">All Categories</option>
                         {% for category in categories %}
@@ -94,31 +117,36 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-md-6">
-                    <div class="form-check mb-2">
+                <div class="col-md-4">
+                    <div class="form-check form-switch mb-2">
                         <input class="form-check-input" type="checkbox" id="showCompleted" name="show_completed" value="1" {% if show_completed %}checked{% endif %}>
-                        <label class="form-check-label" for="showCompleted">Show only completed notes</label>
+                        <label class="form-check-label" for="showCompleted"><i class="bi bi-check2"></i></label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="showIncomplete" name="show_incomplete" value="1" {% if show_incomplete is none or show_incomplete %}checked{% endif %}>
+                        <label class="form-check-label" for="showIncomplete"><i class="bi bi-circle"></i></label>
                     </div>
                 </div>
             </div>
         </form>
         <div id="reminders" class="mb-3"></div>
-        <div class="row">
+        <div class="row" id="notesContainer">
             {% for note in notes %}
                 <div class="col-12 col-md-6 col-lg-4 mb-3">
-                    <div class="card category-card" style="background-color: {{ note.category.color if note.category and note.category.color else '#ffffff' }};">
+                    <div class="card category-card {% if note.due_date and note.due_date <= now and not note.is_completed %}reminder{% endif %}" style="background-color: {{ note.category.color if note.category and note.category.color else '#ffffff' }};">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
-                                <div class="form-check">
-                                    <input class="form-check-input complete-checkbox" type="checkbox" data-note-id="{{ note.id }}" {% if note.is_completed %}checked{% endif %}>
-                                </div>
                                 <h5 class="card-title">{{ note.title }}</h5>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input complete-switch" type="checkbox" data-note-id="{{ note.id }}" id="complete-switch-{{ note.id }}" {% if note.is_completed %}checked{% endif %}>
+                                </div>
                             </div>
                             <p class="card-text">{{ note.content|truncate(100) }}</p>
-                            <p class="card-text"><small class="text-muted">Tags: {{ note.tags or 'None' }}</small></p>
                             <p class="card-text"><small class="text-muted">Category: {{ note.category.name if note.category else 'None' }}</small></p>
                             {% if note.due_date and not note.is_completed %}
-                                <p class="card-text"><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
+                                <p class="card-text"><small class="text-muted due-date" data-due-date="{{ note.due_date.isoformat() if note.due_date else '' }}">Due: </small></p>
                             {% endif %}
                             {% if note.share_id %}
                                 <p class="card-text"><small class="text-muted">Share: <a href="{{ url_for('share_note', share_id=note.share_id) }}" target="_blank">Link</a></small></p>
@@ -134,23 +162,58 @@
                 </div>
             {% endfor %}
         </div>
-        <h3>Categories</h3>
-        <div class="row">
-            {% for category in categories %}
-                <div class="col-12 col-md-4 mb-3">
-                    <div class="card" style="background-color: {{ category.color or '#ffffff' }};">
-                        <div class="card-body d-flex justify-content-between align-items-center">
-                            <span>{{ category.name }}</span>
-                            <div>
-                                <a href="{{ url_for('edit_category', id=category.id) }}" class="btn btn-sm me-1"><i class="bi bi-pencil"></i></a>
-                                <a href="{{ url_for('delete_category', id=category.id) }}" class="btn btn-sm"><i class="bi bi-trash"></i></a>
+    </div>
+    <!-- Add Memo Modal -->
+    {% if categories %}
+    <div class="modal fade" id="addMemoModal" tabindex="-1" aria-labelledby="addMemoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addMemoModalLabel">Add New Memo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addMemoForm" method="POST" action="{{ url_for('add_note') }}">
+                        <div class="mb-3">
+                            <label for="memoTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="memoTitle" name="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoContent" class="form-label">Content</label>
+                            <textarea class="form-control" id="memoContent" name="content" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoDueDate" class="form-label">Due Date (JST)</label>
+                            <input type="datetime-local" class="form-control" id="memoDueDate" name="due_date" step="60">
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoCategory" class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" id="memoCategory" name="category_id" required>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="memoShare" name="share">
+                                <label class="form-check-label" for="memoShare">Enable public sharing</label>
                             </div>
                         </div>
-                    </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="memoCompleted" name="is_completed">
+                                <label class="form-check-label" for="memoCompleted">Completed</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Memo</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </form>
                 </div>
-            {% endfor %}
+            </div>
         </div>
     </div>
+    {% endif %}
     <!-- Settings Modal -->
     <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -205,59 +268,274 @@
             localStorage.setItem('theme', theme);
         });
 
-        // Real-time search
+        // Real-time search with AJAX
         const searchInput = document.getElementById('searchInput');
         const categorySelect = document.getElementById('categorySelect');
         const showCompleted = document.getElementById('showCompleted');
-        function updateSearch() {
-            const params = new URLSearchParams({
-                search: searchInput.value,
-                category_id: categorySelect.value,
-                show_completed: showCompleted.checked ? 1 : 0
-            });
-            window.location.href = '/?' + params.toString();
-        }
-        searchInput.addEventListener('input', updateSearch);
-        categorySelect.addEventListener('change', updateSearch);
-        showCompleted.addEventListener('change', updateSearch);
-
-        // Reminders
-        const notes = {{ notes_data | tojson }};
-        const now = new Date();
-        const reminders = notes
-            .filter(note => note.due_date && new Date(note.due_date) <= now && !note.is_completed)
-            .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+        const showIncomplete = document.getElementById('showIncomplete');
+        const notesContainer = document.getElementById('notesContainer');
         const remindersDiv = document.getElementById('reminders');
-        reminders.forEach(note => {
-            const reminder = document.createElement('div');
-            reminder.className = 'alert alert-warning';
-            reminder.textContent = `Reminder: "${note.title}" is due at ${new Date(note.due_date).toLocaleString()}`;
-            remindersDiv.appendChild(reminder);
-        });
 
-        // Toggle complete
-        document.querySelectorAll('.complete-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', async () => {
-                const noteId = checkbox.dataset.noteId;
-                const response = await fetch(`/toggle_complete/${noteId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (response.ok) {
-                    window.location.reload();
+        // Store notes data globally
+        let notes = {{ notes_data | tojson }};
+
+        // Format date to yyyy/mm/dd (aaa) HH:MM in JST
+        function formatDateJST(isoDate) {
+            if (!isoDate) return '';
+            const date = new Date(isoDate);
+            const options = {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                weekday: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Tokyo'
+            };
+            const formatter = new Intl.DateTimeFormat('ja-JP', options);
+            const parts = formatter.formatToParts(date);
+            const year = parts.find(p => p.type === 'year').value;
+            const month = parts.find(p => p.type === 'month').value;
+            const day = parts.find(p => p.type === 'day').value;
+            const weekday = parts.find(p => p.type === 'weekday').value;
+            const hour = parts.find(p => p.type === 'hour').value;
+            const minute = parts.find(p => p.type === 'minute').value;
+            return `${year}/${month}/${day} (${weekday}) ${hour}:${minute}`;
+        }
+
+        // Update due date displays
+        function updateDueDateDisplays() {
+            document.querySelectorAll('.due-date').forEach(el => {
+                const isoDate = el.getAttribute('data-due-date');
+                if (isoDate) {
+                    el.textContent = `Due: ${formatDateJST(isoDate)}`;
                 }
             });
+        }
+        updateDueDateDisplays();
+
+        async function updateSearch() {
+            const search = searchInput.value.toLowerCase();
+            const category_id = categorySelect.value;
+            const show_completed = showCompleted.checked ? 1 : 0;
+            const show_incomplete = showIncomplete.checked ? 1 : 0;
+            const params = new URLSearchParams({
+                search,
+                category_id,
+                show_completed,
+                show_incomplete
+            });
+            try {
+                const response = await fetch(`/?${params.toString()}`);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const newNotesContainer = doc.getElementById('notesContainer');
+                notesContainer.innerHTML = newNotesContainer.innerHTML;
+                // Update notes array with fresh data
+                const newNotesData = doc.querySelector('script').textContent.match(/let notes = (\[.*?\]);/s);
+                if (newNotesData) {
+                    notes = JSON.parse(newNotesData[1]);
+                }
+                // Re-apply text color adjustments
+                adjustTextColors();
+                // Re-attach toggle switch event listeners
+                attachToggleSwitchListeners();
+                // Update reminders
+                updateReminders();
+                // Update due date displays
+                updateDueDateDisplays();
+            } catch (error) {
+                console.error('Search error:', error);
+            }
+        }
+
+        // Initialize showIncomplete to ON if no query parameter
+        if (!{{ show_incomplete | tojson }}) {
+            showIncomplete.checked = true;
+            showCompleted.checked = false;
+            updateSearch();
+        }
+
+        let searchTimeout;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(updateSearch, 300); // Debounce 300ms
+        });
+        categorySelect.addEventListener('change', updateSearch);
+        showCompleted.addEventListener('change', () => {
+            updateSearch();
+        });
+        showIncomplete.addEventListener('change', () => {
+            updateSearch();
         });
 
-        // Adjust text color based on background
-        document.querySelectorAll('.category-card').forEach(card => {
-            const bgColor = card.style.backgroundColor;
-            if (bgColor) {
-                const rgb = bgColor.match(/\d+/g).map(Number);
-                const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
-                card.style.color = luminance > 0.5 ? '#000000' : '#ffffff';
+        // Add Memo Modal Handling
+        const addMemoModal = new bootstrap.Modal(document.getElementById('addMemoModal'));
+        document.getElementById('addMemoForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const form = this;
+            const formData = new FormData(form);
+            // Ensure due_date is YYYY-MM-DDTHH:mm or empty
+            const dueDate = formData.get('due_date');
+            if (dueDate) {
+                formData.set('due_date', dueDate.slice(0, 16));
+            }
+            // Handle checkboxes
+            formData.set('is_completed', formData.get('is_completed') ? '1' : '');
+            formData.set('share', formData.get('share') ? '1' : '');
+            // Log form data
+            const formDataObj = Object.fromEntries(formData);
+            console.log('Submitting form data:', formDataObj);
+            try {
+                const response = await fetch('{{ url_for("add_note") }}', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                console.log('Response status:', response.status);
+                if (response.redirected) {
+                    console.log('Redirecting to:', response.url);
+                    window.location.href = response.url;
+                } else {
+                    const data = await response.json();
+                    console.log('Response data:', data);
+                    if (data.status === 'success') {
+                        addMemoModal.hide();
+                        updateSearch(); // Refresh notes
+                    } else {
+                        alert('Failed to add memo: ' + (data.message || 'Unknown error'));
+                    }
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('Error adding memo: ' + error.message);
             }
         });
+
+        // Set default due_date to current time in JST when modal opens
+        document.getElementById('addMemoModal').addEventListener('show.bs.modal', function() {
+            const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000); // Current time in JST
+            const dateStr = nowJST.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+            document.getElementById('memoDueDate').value = dateStr;
+            document.getElementById('addMemoForm').reset();
+            document.getElementById('memoDueDate').value = dateStr; // Persist due_date
+        });
+
+        // Reminders
+        function updateReminders() {
+            const now = new Date();
+            const search = searchInput.value.toLowerCase();
+            const category_id = categorySelect.value;
+            const show_completed = showCompleted.checked;
+            const show_incomplete = showIncomplete.checked;
+
+            // Filter notes based on current search criteria
+            let filteredNotes = notes.filter(note => {
+                // Search filter
+                const matchesSearch = !search ||
+                    (note.title.toLowerCase().includes(search) ||
+                     note.content.toLowerCase().includes(search));
+                // Category filter
+                const matchesCategory = !category_id || note.category_id === parseInt(category_id);
+                // Completion filter
+                const matchesCompletion =
+                    (show_completed && note.is_completed) ||
+                    (show_incomplete && !note.is_completed) ||
+                    (!show_completed && !show_incomplete);
+                return matchesSearch && matchesCategory && matchesCompletion;
+            });
+
+            // Filter for reminders (overdue and incomplete)
+            const reminders = filteredNotes
+                .filter(note => {
+                    if (!note.due_date) return false;
+                    // Convert UTC due_date to JST for comparison
+                    const dueDateJST = new Date(note.due_date);
+                    return dueDateJST <= now && !note.is_completed;
+                })
+                .sort((a, b) => new Date(a.due_date) - new Date(b.due_date));
+
+            // Update reminders div
+            remindersDiv.innerHTML = ''; // Clear existing reminders
+            reminders.forEach(note => {
+                const reminder = document.createElement('div');
+                reminder.className = 'alert alert-warning';
+                // Display due_date in JST with custom format
+                const dueDateFormatted = formatDateJST(note.due_date);
+                reminder.textContent = `Reminder: "${note.title}" is due at ${dueDateFormatted}`;
+                remindersDiv.appendChild(reminder);
+            });
+        }
+        updateReminders();
+
+        // Toggle switch
+        function attachToggleSwitchListeners() {
+            document.querySelectorAll('.complete-switch').forEach(switchEl => {
+                switchEl.addEventListener('change', async () => {
+                    const noteId = parseInt(switchEl.dataset.noteId);
+                    const isChecked = switchEl.checked;
+                    try {
+                        const response = await fetch(`/toggle_complete/${noteId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        if (response.ok) {
+                            // Update the notes array
+                            const note = notes.find(n => n.id === noteId);
+                            if (note) {
+                                note.is_completed = isChecked;
+                                // Update reminders immediately
+                                updateReminders();
+                                // Update card class for reminder
+                                const card = switchEl.closest('.category-card');
+                                if (card) {
+                                    const now = new Date();
+                                    // Convert UTC due_date to JST for comparison
+                                    const dueDateJST = note.due_date ? new Date(note.due_date) : null;
+                                    if (dueDateJST && dueDateJST <= now && !isChecked) {
+                                        card.classList.add('reminder');
+                                    } else {
+                                        card.classList.remove('reminder');
+                                    }
+                                }
+                                // Refresh notes if completion state affects visibility
+                                if (showIncomplete.checked || showCompleted.checked) {
+                                    updateSearch();
+                                }
+                            }
+                        } else {
+                            console.error('Toggle failed:', await response.json());
+                            switchEl.checked = !isChecked; // Revert switch on error
+                        }
+                    } catch (error) {
+                        console.error('Toggle error:', error);
+                        switchEl.checked = !isChecked; // Revert switch on error
+                    }
+                });
+            });
+        }
+        attachToggleSwitchListeners();
+
+        // Adjust text color based on background
+        function adjustTextColors() {
+            document.querySelectorAll('.category-card').forEach(card => {
+                const bgColor = card.style.backgroundColor;
+                if (bgColor) {
+                    const rgb = bgColor.match(/\d+/g)?.map(Number) ||-uk [255, 255, 255];
+                    const luminance = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255;
+                    const textColor = luminance > 0.5 ? '#000000' : '#ffffff';
+                    card.style.color = textColor;
+                    card.querySelectorAll('.card-title, .card-text, .text-muted, .text-muted a, .card-body a').forEach(el => {
+                        el.style.color = textColor;
+                    });
+                }
+            });
+        }
+        adjustTextColors();
     </script>
 </body>
 </html>

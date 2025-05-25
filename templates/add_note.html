@@ -9,6 +9,13 @@
 <body>
     <div class="container mt-4">
         <h2>Add New Note</h2>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
         <form method="POST">
             <div class="mb-3">
                 <label for="title" class="form-label">Title</label>
@@ -19,17 +26,19 @@
                 <textarea class="form-control" id="content" name="content" rows="5" required></textarea>
             </div>
             <div class="mb-3">
-                <label for="tags" class="form-label">Tags (comma-separated)</label>
-                <input type="text" class="form-control" id="tags" name="tags">
-            </div>
-            <div class="mb-3">
-                <label for="category_id" class="form-label">Category</label>
-                <select class="form-select" id="category_id" name="category_id">
-                    <option value="">None</option>
-                    {% for category in categories %}
-                        <option value="{{ category.id }}">{{ category.name }}</option>
-                    {% endfor %}
+                <label for="category_id" class="form-label">Category <span class="text-danger">*</span></label>
+                <select class="form-select" id="category_id" name="category_id" required>
+                    {% if categories %}
+                        {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="" disabled selected>No categories available</option>
+                    {% endif %}
                 </select>
+                {% if not categories %}
+                    <small class="form-text text-muted">Please <a href="{{ url_for('add_category') }}">add a category</a> first.</small>
+                {% endif %}
             </div>
             <div class="mb-3">
                 <label for="due_date" class="form-label">Due Date</label>

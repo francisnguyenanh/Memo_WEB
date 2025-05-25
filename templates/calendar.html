@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar - Memo App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f8f9fa;
+            --primary-color: #0d6efd;
+        }
+        [data-theme="dark"] {
+            --bg-color: #343a40;
+            --text-color: #ffffff;
+            --card-bg: #495057;
+            --primary-color: #6c757d;
+        }
+        [data-theme="blue"] {
+            --bg-color: #e6f0fa;
+            --text-color: #003087;
+            --card-bg: #d6e4f0;
+            --primary-color: #004aad;
+        }
+        [data-theme="green"] {
+            --bg-color: #e6f4ea;
+            --text-color: #004d00;
+            --card-bg: #d4edda;
+            --primary-color: #006400;
+        }
+        [data-theme="purple"] {
+            --bg-color: #f3e5f5;
+            --text-color: #4a0072;
+            --card-bg: #e1bee7;
+            --primary-color: #6a1b9a;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        #calendar {
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+        .fc-event {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light" style="background-color: var(--card-bg);">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Memo App</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('add_note') }}">Add Note</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('manage_categories') }}">Categories</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('calendar') }}">Calendar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('import_note') }}">Import Note</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% if not categories %}
+            <div class="alert alert-danger">
+                No categories available. Please <a href="{{ url_for('add_category') }}">add a category</a> first.
+            </div>
+        {% else %}
+            <h2>Calendar</h2>
+            <div id="calendar"></div>
+        {% endif %}
+    </div>
+    <!-- Add Memo Modal -->
+    {% if categories %}
+    <div class="modal fade" id="addMemoModal" tabindex="-1" aria-labelledby="addMemoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addMemoModalLabel">Add New Memo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addMemoForm" method="POST" action="{{ url_for('add_note') }}">
+                        <div class="mb-3">
+                            <label for="memoTitle" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="memoTitle" name="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoContent" class="form-label">Content</label>
+                            <textarea class="form-control" id="memoContent" name="content" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoDueDate" class="form-label">Due Date (JST)</label>
+                            <input type="datetime-local" class="form-control" id="memoDueDate" name="due_date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoCategory" class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" id="memoCategory" name="category_id" required>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="memoShare" name="share">
+                                <label class="form-check-label" for="memoShare">Enable public sharing</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="memoCompleted" name="is_completed">
+                                <label class="form-check-label" for="memoCompleted">Completed</label>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Memo</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="settingsModalLabel">Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="POST" action="{{ url_for('change_password') }}">
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Change Password</label>
+                            <input type="password" class="form-control" id="new_password" name="new_password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Password</button>
+                    </form>
+                    <hr>
+                    <div class="mb-3">
+                        <label for="themeSelect" class="form-label">Theme</label>
+                        <select class="form-select" id="themeSelect">
+                            <option value="light">Light</option>
+                            <option value="dark">Dark</option>
+                            <option value="blue">Blue</option>
+                            <option value="green">Green</option>
+                            <option value="purple">Purple</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme switching
+            const themeSelect = document.getElementById('themeSelect');
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            themeSelect.value = currentTheme;
+            themeSelect.addEventListener('change', () => {
+                const theme = themeSelect.value;
+                document.documentElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+            });
+
+            // Skip calendar initialization if no categories
+            {% if not categories %}
+                return;
+            {% endif %}
+
+            const calendarEl = document.getElementById('calendar');
+            const addMemoModal = new bootstrap.Modal(document.getElementById('addMemoModal'));
+            const memoDueDateInput = document.getElementById('memoDueDate');
+
+            // Initialize FullCalendar
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay,year'
+                },
+                events: '/notes',
+                eventTimeFormat: {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                },
+                eventClick: function(info) {
+                    window.location.href = `/edit_note/${info.event.id}`;
+                },
+                dateClick: function(info) {
+                    const jstDate = new Date(info.date.getTime() + 9 * 60 * 60 * 1000); // Convert to JST
+                    const dateStr = jstDate.toISOString().slice(0, 16); // Format as YYYY-MM-DDTHH:mm
+                    memoDueDateInput.value = dateStr;
+                    document.getElementById('addMemoForm').reset();
+                    memoDueDateInput.value = dateStr; // Ensure due_date persists
+                    addMemoModal.show();
+                },
+                eventContent: function(arg) {
+                    const title = arg.event.title;
+                    const isCompleted = arg.event.extendedProps.is_completed;
+                    return {
+                        html: `<div>${title}${isCompleted ? ' (✔)' : ''}</div>`
+                    };
+                }
+            });
+            calendar.render();
+
+            // Handle form submission
+            document.getElementById('addMemoForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const form = this;
+                const formData = new FormData(form);
+                // Keep due_date as is (YYYY-MM-DDTHH:mm in JST, matches add_note expectation)
+                formData.set('is_completed', formData.get('is_completed') ? '1' : '0');
+                formData.set('share', formData.get('share') ? '1' : '0');
+                try {
+                    const response = await fetch('{{ url_for("add_note") }}', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (response.redirected) {
+                        // Follow the redirect to get flash messages
+                        window.location.href = response.url;
+                    } else {
+                        const data = await response.json();
+                        if (data.status === 'success') {
+                            addMemoModal.hide();
+                            calendar.refetchEvents();
+                        } else {
+                            alert('Failed to add memo: ' + (data.message || 'Unknown error'));
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error adding memo:', error);
+                    alert('Error adding memo');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
