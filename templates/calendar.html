@@ -7,6 +7,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Thêm heic2any -->
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.3/dist/heic2any.min.js"></script>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -73,6 +76,7 @@
         body {
             background-color: var(--bg-color);
             color: var(--text-color);
+            font-family: 'Noto Sans JP', sans-serif;
         }
         .navbar {
             background-color: var(--card-bg);
@@ -110,12 +114,30 @@
         .category-card .text-muted, .category-card .text-muted a {
             color: inherit !important;
         }
-        /* Responsive styles for mobile */
+        .image-preview img, #editImagePreview img {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .position-relative {
+            display: inline-block;
+        }
+        .position-relative .btn-danger {
+            padding: 2px 6px;
+            font-size: 12px;
+        }
+        .modal-body img {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
         @media (max-width: 576px) {
             #calendar {
                 margin: 20px 10px;
                 font-size: 14px;
-                height: 95vh; /* Chiều cao calendar bằng 95% chiều cao màn hình */
+                height: 95vh;
             }
             .fc .fc-toolbar-title {
                 font-size: 1rem;
@@ -209,18 +231,23 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addMemoForm" method="POST" action="{{ url_for('add_note') }}">
+                    <form id="addMemoForm" method="POST" action="{{ url_for('add_note') }}" enctype="multipart/form-data">
                         <div class="mb-3">
                             <label for="memoTitle" class="form-label">Title</label>
                             <input type="text" class="form-control" id="memoTitle" name="title" required>
                         </div>
                         <div class="mb-3">
                             <label for="memoContent" class="form-label">Content</label>
-                            <textarea class="form-control" id="memoContent" name="content" rows="3" required></textarea>
+                            <textarea class="form-control" id="memoContent" name="content" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="memoImages" class="form-label">Images (PNG, JPG, JPEG, GIF, HEIC)</label>
+                            <input type="file" class="form-control" id="memoImages" name="images" multiple accept="image/png,image/jpeg,image/gif,image/heic">
+                            <div id="imagePreview" class="mt-2 image-preview d-flex flex-wrap gap-2"></div>
                         </div>
                         <div class="mb-3">
                             <label for="memoDueDate" class="form-label">Due Date (JST)</label>
-                            <input type="datetime-local" class="form-control" id="memoDueDate" name="due_date" required>
+                            <input type="datetime-local" class="form-control" id="memoDueDate" name="due_date" required step="60">
                         </div>
                         <div class="mb-3">
                             <label for="memoCategory" class="form-label">Category <span class="text-danger">*</span></label>
@@ -239,14 +266,14 @@
                             <label class="form-check-label" for="memoCompleted">Completed</label>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Save Memo</button>
+                        <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Cancel</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
-
-    <!-- New Edit Memo Modal -->
+    <!-- Edit Memo Modal -->
     {% if categories %}
     <div class="modal fade" id="editMemoModal" tabindex="-1" aria-labelledby="editMemoModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -256,7 +283,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="editMemoForm" method="POST">
+                    <form id="editMemoForm" method="POST" enctype="multipart/form-data">
                         <input type="hidden" id="editMemoId" name="id">
                         <div class="mb-3">
                             <label for="editMemoTitle" class="form-label">Title</label>
@@ -264,11 +291,16 @@
                         </div>
                         <div class="mb-3">
                             <label for="editMemoContent" class="form-label">Content</label>
-                            <textarea class="form-control" id="editMemoContent" name="content" rows="3" required></textarea>
+                            <textarea class="form-control" id="editMemoContent" name="content" rows="4" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editMemoImages" class="form-label">Images (PNG, JPG, JPEG, GIF, HEIC)</label>
+                            <input type="file" class="form-control" id="editMemoImages" name="images" multiple accept="image/png,image/jpeg,image/gif,image/heic">
+                            <div id="editImagePreview" class="mt-2 image-preview d-flex flex-wrap gap-2"></div>
                         </div>
                         <div class="mb-3">
                             <label for="editMemoDueDate" class="form-label">Due Date (JST)</label>
-                            <input type="datetime-local" class="form-control" id="editMemoDueDate" name="due_date" required>
+                            <input type="datetime-local" class="form-control" id="editMemoDueDate" name="due_date" required step="60">
                         </div>
                         <div class="mb-3">
                             <label for="editMemoCategory" class="form-label">Category <span class="text-danger">*</span></label>
@@ -287,14 +319,27 @@
                             <label class="form-check-label" for="editMemoCompleted">Completed</label>
                         </div>
                         <button type="submit" class="btn btn-primary w-100">Update Memo</button>
+                        <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Cancel</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
     {% endif %}
-
-
+    <!-- Modal để xem ảnh phóng to -->
+    <div class="modal fade" id="imageViewModal" tabindex="-1" aria-labelledby="imageViewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageViewModalLabel">Image Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="enlargedImage" src="" alt="Enlarged Image">
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Manage Categories Modal -->
     <div class="modal fade" id="manageCategoriesModal" tabindex="-1" aria-labelledby="manageCategoriesModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -380,7 +425,7 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/interaction/main.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Theme switching and text color adjustment
+            // Theme switching và điều chỉnh màu chữ
             const themeSelect = document.getElementById('themeSelect');
             const currentTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', currentTheme);
@@ -418,7 +463,7 @@
                 adjustCategoryTextColors();
             });
 
-            // Skip calendar initialization if no categories
+            // Bỏ qua khởi tạo lịch nếu không có danh mục
             {% if not categories %}
                 return;
             {% endif %}
@@ -426,10 +471,174 @@
             const calendarEl = document.getElementById('calendar');
             const addMemoModal = new bootstrap.Modal(document.getElementById('addMemoModal'));
             const editMemoModal = new bootstrap.Modal(document.getElementById('editMemoModal'));
+            const imageViewModal = new bootstrap.Modal(document.getElementById('imageViewModal'));
             const memoDueDateInput = document.getElementById('memoDueDate');
             const editMemoForm = document.getElementById('editMemoForm');
 
-            // Initialize FullCalendar
+            // Biến lưu trữ ảnh
+            let selectedFilesAdd = [];
+            let selectedFilesEdit = [];
+            let existingImagesEdit = [];
+
+            // Hàm resize ảnh xuống 30% kích thước
+            async function resizeImage(file, scale = 0.3) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        img.src = e.target.result;
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            canvas.width = img.width * scale;
+                            canvas.height = img.height * scale;
+                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            canvas.toBlob((blob) => {
+                                const newFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+                                resolve(newFile);
+                            }, 'image/jpeg', 0.3); // Chất lượng JPEG = 0.3
+                        };
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // Hàm xử lý và chuyển đổi ảnh
+            async function processImage(file) {
+                if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
+                    try {
+                        const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.3 });
+                        const convertedFile = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+                        return await resizeImage(convertedFile, 0.3);
+                    } catch (error) {
+                        console.error('Error converting HEIC:', error);
+                        showFlashMessage('danger', 'Failed to convert HEIC image');
+                        return null;
+                    }
+                } else {
+                    return await resizeImage(file, 0.3);
+                }
+            }
+
+            // Hàm hiển thị preview ảnh với nút xóa
+            function updateImagePreview(previewContainer, files, isAddModal) {
+                previewContainer.innerHTML = '';
+                files.forEach((file, index) => {
+                    const container = document.createElement('div');
+                    container.className = 'position-relative';
+                    const img = document.createElement('img');
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.objectFit = 'contain';
+                    img.classList.add('img-thumbnail');
+
+                    const setImageSource = (src) => {
+                        img.src = src;
+                        container.appendChild(img);
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0';
+                        deleteBtn.innerHTML = '<i class="bi bi-x"></i>';
+                        deleteBtn.onclick = () => {
+                            if (isAddModal) {
+                                selectedFilesAdd.splice(index, 1);
+                                updateImagePreview(previewContainer, selectedFilesAdd, true);
+                            } else {
+                                if (index < existingImagesEdit.length) {
+                                    existingImagesEdit.splice(index, 1);
+                                } else {
+                                    selectedFilesEdit.splice(index - existingImagesEdit.length, 1);
+                                }
+                                updateImagePreview(previewContainer, [...existingImagesEdit, ...selectedFilesEdit], false);
+                            }
+                        };
+                        container.appendChild(deleteBtn);
+                        // Thêm sự kiện click để xem ảnh phóng to
+                        img.onclick = () => {
+                            document.getElementById('enlargedImage').src = src;
+                            imageViewModal.show();
+                        };
+                        previewContainer.appendChild(container);
+                    };
+
+                    if (typeof file === 'string') {
+                        // Ảnh hiện có (base64)
+                        setImageSource(file);
+                    } else {
+                        setImageSource(URL.createObjectURL(file));
+                    }
+                });
+            }
+
+            // Xử lý chọn ảnh trong addMemoModal
+            document.getElementById('memoImages').addEventListener('change', async function(e) {
+                const imagePreview = document.getElementById('imagePreview');
+                const files = Array.from(e.target.files);
+                for (const file of files) {
+                    const processedFile = await processImage(file);
+                    if (processedFile) {
+                        selectedFilesAdd.push(processedFile);
+                    }
+                }
+                updateImagePreview(imagePreview, selectedFilesAdd, true);
+            });
+
+            // Xử lý chọn ảnh trong editMemoModal
+            document.getElementById('editMemoImages').addEventListener('change', async function(e) {
+                const editImagePreview = document.getElementById('editImagePreview');
+                const files = Array.from(e.target.files);
+                for (const file of files) {
+                    const processedFile = await processImage(file);
+                    if (processedFile) {
+                        selectedFilesEdit.push(processedFile);
+                    }
+                }
+                updateImagePreview(editImagePreview, [...existingImagesEdit, ...selectedFilesEdit], false);
+            });
+
+            // Xử lý submit form addMemoForm
+            document.getElementById('addMemoForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const form = this;
+                const formData = new FormData(form);
+                formData.set('is_completed', formData.get('is_completed') ? '1' : '0');
+                formData.set('share', formData.get('share') ? '1' : '');
+                formData.delete('images');
+                for (const file of selectedFilesAdd) {
+                    formData.append('files', file);
+                }
+                try {
+                    const response = await fetch('{{ url_for("add_note") }}', {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        addMemoModal.hide();
+                        calendar.refetchEvents();
+                        selectedFilesAdd = [];
+                        document.getElementById('imagePreview').innerHTML = '';
+                        showFlashMessage('success', 'Memo added successfully');
+                    } else {
+                        showFlashMessage('danger', 'Failed to add memo: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error adding memo:', error);
+                    showFlashMessage('danger', 'Error adding memo: ' + error.message);
+                }
+            });
+
+            // Xử lý mở addMemoModal
+            document.getElementById('addMemoModal').addEventListener('show.bs.modal', function() {
+                document.getElementById('addMemoForm').reset();
+                selectedFilesAdd = [];
+                document.getElementById('imagePreview').innerHTML = '';
+                const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+                const dateStr = nowJST.toISOString().slice(0, 16);
+                memoDueDateInput.value = dateStr;
+            });
+
+            // Khởi tạo FullCalendar
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
                 headerToolbar: {
@@ -463,109 +672,92 @@
                         html: `<div>${title}${isCompleted ? ' (✔)' : ''}</div>`
                     };
                 },
-                eventStartEditable: window.innerWidth >= 576,
-                eventDurationEditable: window.innerWidth >= 576
+                eventStartEditable: window.innerWidth >= 768,
+                eventDurationEditable: true
             });
-
             calendar.render();
 
-            // Function to populate edit modal
+            // Hàm mở và điền dữ liệu vào editMemoModal
             async function openEditMemoModal(noteId) {
-            try {
-                const response = await fetch(`/edit_note/${noteId}`, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    const note = data.note;
-                    document.getElementById('editMemoId').value = note.id;
-                    document.getElementById('editMemoTitle').value = note.title;
-                    document.getElementById('editMemoContent').value = note.content;
-                    document.getElementById('editMemoDueDate').value = note.due_date || '';
-                    document.getElementById('editMemoCategory').value = note.category_id;
-                    document.getElementById('editMemoShare').checked = !!note.share_id;
-                    document.getElementById('editMemoCompleted').checked = note.is_completed === true; // Ensure correct boolean handling
-                    // Update category options
-                    const categorySelect = document.getElementById('editMemoCategory');
-                    categorySelect.innerHTML = '';
-                    data.categories.forEach(category => {
-                        const option = document.createElement('option');
-                        option.value = category.id;
-                        option.textContent = category.name;
-                        if (category.id == note.category_id) {
-                            option.selected = true;
-                        }
-                        categorySelect.appendChild(option);
-                    });
-                    editMemoModal.show();
-                } else {
-                    showFlashMessage('danger', data.message || 'Failed to load note data.');
-                }
-            } catch (error) {
-                console.error('Error loading note:', error);
-                showFlashMessage('danger', 'Error loading note.');
-            }
-        }
-
-            // Handle edit memo form submission
-            editMemoForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            // Explicitly set is_completed to '1' or '0'
-            formData.set('is_completed', document.getElementById('editMemoCompleted').checked ? '1' : '0');
-            formData.set('share', document.getElementById('editMemoShare').checked ? '1' : '0');
-            const noteId = formData.get('id');
-            try {
-                const response = await fetch(`/edit_note/${noteId}`, {
-                    method: 'POST',
-                    body: formData,
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                });
-                const data = await response.json();
-                if (data.status === 'success') {
-                    editMemoModal.hide();
-                    calendar.refetchEvents();
-                    showFlashMessage('success', data.message);
-                } else {
-                    showFlashMessage('danger', data.message || 'Failed to update note.');
-                }
-            } catch (error) {
-                console.error('Error updating note:', error);
-                showFlashMessage('danger', 'Error updating note.');
-            }
-        });
-
-
-            // Handle form submission for adding memo
-            document.getElementById('addMemoForm').addEventListener('submit', async function(e) {
-                e.preventDefault();
-                const form = this;
-                const formData = new FormData(form);
-                formData.set('is_completed', formData.get('is_completed') ? '1' : '0');
-                formData.set('share', formData.get('share') ? '1' : '0');
                 try {
-                    const response = await fetch('{{ url_for("add_note") }}', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
+                    const response = await fetch(`/edit_note/${noteId}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
                     const data = await response.json();
                     if (data.status === 'success') {
-                        addMemoModal.hide();
-                        calendar.refetchEvents();
-                        updateCategorySelect();
+                        const note = data.note;
+                        document.getElementById('editMemoId').value = note.id;
+                        document.getElementById('editMemoTitle').value = note.title;
+                        document.getElementById('editMemoContent').value = note.content;
+                        document.getElementById('editMemoDueDate').value = note.due_date || '';
+                        document.getElementById('editMemoCategory').value = note.category_id;
+                        document.getElementById('editMemoShare').checked = !!note.share_id;
+                        document.getElementById('editMemoCompleted').checked = note.is_completed;
+
+                        // Hiển thị ảnh hiện có
+                        const editImagePreview = document.getElementById('editImagePreview');
+                        existingImagesEdit = note.images ? note.images.map(img => `data:image/${img.filename.split('.').pop().toLowerCase()};base64,${img.data}`) : [];
+                        selectedFilesEdit = [];
+                        updateImagePreview(editImagePreview, existingImagesEdit, false);
+
+                        // Cập nhật danh mục
+                        const categorySelect = document.getElementById('editMemoCategory');
+                        categorySelect.innerHTML = '';
+                        data.categories.forEach(category => {
+                            const option = document.createElement('option');
+                            option.value = category.id;
+                            option.textContent = category.name;
+                            if (category.id === note.category_id) {
+                                option.selected = true;
+                            }
+                            categorySelect.appendChild(option);
+                        });
+                        editMemoModal.show();
                     } else {
-                        alert('Failed to add memo: ' + (data.message || 'Unknown error'));
+                        showFlashMessage('danger', 'Failed to load note data: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
-                    console.error('Error adding memo:', error);
-                    alert('Error adding memo');
+                    console.error('Error loading note:', error);
+                    showFlashMessage('danger', 'Error loading note: ' + error.message);
+                }
+            }
+
+            // Xử lý submit form editMemoForm
+            editMemoForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                formData.set('is_completed', document.getElementById('editMemoCompleted').checked ? '1' : '0');
+                formData.set('share', document.getElementById('editMemoShare').checked ? '1' : '0');
+                const noteId = formData.get('id');
+                formData.delete('images');
+                for (const file of selectedFilesEdit) {
+                    formData.append('files', file);
+                }
+                existingImagesEdit.forEach((_, index) => formData.append('keep_images', index));
+                try {
+                    const response = await fetch(`/edit_note/${noteId}`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        editMemoModal.hide();
+                        calendar.refetchEvents();
+                        selectedFilesEdit = [];
+                        existingImagesEdit = [];
+                        document.getElementById('editImagePreview').innerHTML = '';
+                        showFlashMessage('success', data.message || 'Memo updated successfully');
+                    } else {
+                        showFlashMessage('danger', data.message || 'Failed to update memo');
+                    }
+                } catch (error) {
+                    console.error('Error updating memo:', error);
+                    showFlashMessage('danger', 'Error updating memo: ' + error.message);
                 }
             });
 
-            // Manage Categories Modal Handling
+            // Quản lý danh mục
             const manageCategoriesModal = new bootstrap.Modal(document.getElementById('manageCategoriesModal'));
             const addCategoryForm = document.getElementById('addCategoryForm');
             const categoriesContainer = document.getElementById('categoriesContainer');
@@ -574,12 +766,17 @@
 
             function updateCategorySelect() {
                 const memoCategorySelect = document.getElementById('memoCategory');
-                memoCategorySelect.innerHTML = '';
-                categories.forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category.id;
-                    option.textContent = category.name;
-                    memoCategorySelect.appendChild(option);
+                const editMemoCategorySelect = document.getElementById('editMemoCategory');
+                [memoCategorySelect, editMemoCategorySelect].forEach(select => {
+                    if (select) {
+                        select.innerHTML = '';
+                        categories.forEach(category => {
+                            const option = document.createElement('option');
+                            option.value = category.id;
+                            option.textContent = category.name;
+                            select.appendChild(option);
+                        });
+                    }
                 });
             }
 
@@ -646,9 +843,7 @@
                                 const response = await fetch(`/edit_category/${categoryId}`, {
                                     method: 'POST',
                                     body: formData,
-                                    headers: {
-                                        'X-Requested-With': 'XMLHttpRequest'
-                                    }
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
                                 });
                                 const data = await response.json();
                                 if (data.status === 'success') {
@@ -672,11 +867,11 @@
                                     showFlashMessage('success', 'Category updated successfully');
                                     calendar.refetchEvents();
                                 } else {
-                                    alert('Failed to update category: ' + (data.message || 'Unknown error'));
+                                    showFlashMessage('danger', 'Failed to update category: ' + (data.message || 'Unknown error'));
                                 }
                             } catch (error) {
                                 console.error('Update category error:', error);
-                                alert('Error updating category: ' + error.message);
+                                showFlashMessage('danger', 'Error updating category: ' + error.message);
                             }
                         };
                         addCategoryForm.querySelector('.cancel-edit').addEventListener('click', () => {
@@ -704,9 +899,7 @@
                             try {
                                 const response = await fetch(`/delete_category/${categoryId}`, {
                                     method: 'POST',
-                                    headers: {
-                                        'X-Requested-With': 'XMLHttpRequest'
-                                    }
+                                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
                                 });
                                 const data = await response.json();
                                 if (data.status === 'success') {
@@ -716,11 +909,11 @@
                                     showFlashMessage('success', 'Category deleted successfully');
                                     calendar.refetchEvents();
                                 } else {
-                                    alert('Failed to delete category: ' + (data.message || 'Unknown error'));
+                                    showFlashMessage('danger', 'Failed to delete category: ' + (data.message || 'Unknown error'));
                                 }
                             } catch (error) {
                                 console.error('Delete category error:', error);
-                                alert('Error deleting category: ' + error.message);
+                                showFlashMessage('danger', 'Error deleting category: ' + error.message);
                             }
                         }
                     });
@@ -749,9 +942,7 @@
                     const response = await fetch('{{ url_for("add_category") }}', {
                         method: 'POST',
                         body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
                     const data = await response.json();
                     if (data.status === 'success') {
@@ -762,11 +953,11 @@
                         showFlashMessage('success', 'Category added successfully');
                         calendar.refetchEvents();
                     } else {
-                        alert('Failed to add category: ' + (data.message || 'Unknown error'));
+                        showFlashMessage('danger', 'Failed to add category: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
                     console.error('Add category error:', error);
-                    alert('Error adding category: ' + error.message);
+                    showFlashMessage('danger', 'Error adding category: ' + error.message);
                 }
             });
 
