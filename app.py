@@ -13,6 +13,9 @@ import logging
 from datetime import datetime
 from datetime import datetime, timedelta  # Added timedelta
 from uuid import uuid4  # Added uuid4
+from base64 import b64encode
+import json
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -38,6 +41,7 @@ class Category(db.Model):
     color = db.Column(db.String(7), nullable=True)  # HEX color, e.g., #FF0000
 
 # Note model
+# Trong class Note
 class Note(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
@@ -47,6 +51,7 @@ class Note(db.Model):
     due_date = db.Column(db.DateTime, nullable=True)
     share_id = db.Column(db.String(36), nullable=True)
     is_completed = db.Column(db.Boolean, default=False)
+    images = db.Column(db.Text, nullable=True)  # Lưu JSON chứa danh sách ảnh (base64)
     category = db.relationship('Category', backref='notes')
 
 @login_manager.user_loader
@@ -113,7 +118,8 @@ def index():
             'category_color': note.category.color if note.category else None,
             'due_date': note.due_date.isoformat() if note.due_date else None,
             'share_id': note.share_id,
-            'is_completed': note.is_completed
+            'is_completed': note.is_completed,
+            'images': json.loads(note.images) if note.images else []
         } for note in notes
     ]
     # Fetch categories and convert to JSON-serializable format
@@ -146,7 +152,6 @@ def add_note():
             due_date = request.form.get('due_date')
             share = request.form.get('share') == '1'
             is_completed = request.form.get('is_completed') == '1'
-
 
             # Validate required fields
             if not title:
@@ -186,14 +191,34 @@ def add_note():
                         return jsonify({'status': 'error', 'message': 'Invalid due date format'}), 400
                     return render_template('add_note.html', categories=categories)
 
+            # Handle image uploads
+            images = []
+            files = request.files.getlist('images')
+            for file in files:
+                if file and file.filename:
+                    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                    if os.path.splitext(file.filename.lower())[1] in allowed_extensions:
+                        image_data = file.read()
+                        image_base64 = b64encode(image_data).decode('utf-8')
+                        images.append({
+                            'filename': file.filename,
+                            'data': image_base64
+                        })
+                    else:
+                        flash(f'File {file.filename} is not an allowed image type.', 'danger')
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
+                        return render_template('add_note.html', categories=categories)
+
             note = Note(
                 title=title,
                 content=content,
                 category_id=category_id,
                 user_id=current_user.id,
-                due_date=due_date_obj,
+                due_date=due_date_utc,
                 share_id=str(uuid4()) if share else None,
-                is_completed=is_completed
+                is_completed=is_completed,
+                images=json.dumps(images) if images else None
             )
             db.session.add(note)
             db.session.commit()
@@ -230,20 +255,13 @@ def edit_note(id):
         category_id = request.form.get('category_id')
         due_date = request.form.get('due_date')
         share = 'share' in request.form
-
-        # Handle is_completed explicitly
-        is_completed = False
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            is_completed = request.form.get('is_completed') == '1'
-        else:
-            is_completed = 'is_completed' in request.form
+        is_completed = request.form.get('is_completed') == '1' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'is_completed' in request.form
 
         # Validate category
         categories = Category.query.filter_by(user_id=current_user.id).all()
         if not categories:
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify(
-                    {'status': 'error', 'message': 'No categories available. Please create a category first.'}), 400
+                return jsonify({'status': 'error', 'message': 'No categories available. Please create a category first.'}), 400
             flash('No categories available. Please create a category first.', 'danger')
             return redirect(url_for('add_category'))
         if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
@@ -252,12 +270,39 @@ def edit_note(id):
             flash('Please select a valid category.', 'danger')
             return render_template('edit_note.html', note=note, categories=categories)
 
+        # Handle image uploads
+        images = json.loads(note.images) if note.images else []
+        keep_images = request.form.getlist('keep_images')  # List of indices of images to keep
+        if keep_images:
+            keep_indices = [int(i) for i in keep_images]
+            images = [images[i] for i in keep_indices if i < len(images)]
+        else:
+            images = []
+
+        files = request.files.getlist('images')
+        for file in files:
+            if file and file.filename:
+                allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                if os.path.splitext(file.filename.lower())[1] in allowed_extensions:
+                    image_data = file.read()
+                    image_base64 = b64encode(image_data).decode('utf-8')
+                    images.append({
+                        'filename': file.filename,
+                        'data': image_base64
+                    })
+                else:
+                    flash(f'File {file.filename} is not an allowed image type.', 'danger')
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
+                    return render_template('edit_note.html', note=note, categories=categories)
+
         note.title = title
         note.content = content
         note.category_id = category_id
         note.due_date = datetime.strptime(due_date, '%Y-%m-%dT%H:%M') if due_date else None
         note.share_id = str(uuid.uuid4()) if share and not note.share_id else note.share_id if share else None
         note.is_completed = is_completed
+        note.images = json.dumps(images) if images else None
         db.session.commit()
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -267,6 +312,7 @@ def edit_note(id):
         return redirect(url_for('index'))
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        images = json.loads(note.images) if note.images else []
         return jsonify({
             'status': 'success',
             'note': {
@@ -276,10 +322,10 @@ def edit_note(id):
                 'category_id': note.category_id,
                 'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
                 'share_id': note.share_id,
-                'is_completed': bool(note.is_completed)  # Ensure boolean value
+                'is_completed': bool(note.is_completed),
+                'images': images
             },
-            'categories': [{'id': c.id, 'name': c.name} for c in
-                           Category.query.filter_by(user_id=current_user.id).all()]
+            'categories': [{'id': c.id, 'name': c.name} for c in Category.query.filter_by(user_id=current_user.id).all()]
         })
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
