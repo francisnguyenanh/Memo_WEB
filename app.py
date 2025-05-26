@@ -212,6 +212,7 @@ def add_note():
                             return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
                         return render_template('add_note.html', categories=categories)
 
+            categories = Category.query.filter_by(user_id=current_user.id).all()
             note = Note(
                 title=title,
                 content=content,
@@ -226,9 +227,28 @@ def add_note():
             db.session.commit()
             flash('Note added successfully!', 'success')
 
+
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'success'})
+                return jsonify({
+                    'status': 'success',
+                    'note': {
+                        'id': note.id,
+                        'title': note.title,
+                        'content': note.content,
+                        'category_id': note.category_id,
+                        'category_name': note.category.name,
+                        'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
+                        'share_id': note.share_id,
+                        'is_completed': bool(note.is_completed),
+                        'images': images
+                    },
+                    'categories': [{'id': c.id, 'name': c.name} for c in
+                                   Category.query.filter_by(user_id=current_user.id).all()]
+                })
             return redirect(url_for('index'))
+
+
+
 
         except Exception as e:
             flash('An error occurred while adding the note.', 'danger')
