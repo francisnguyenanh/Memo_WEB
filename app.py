@@ -1,3 +1,5 @@
+import base64
+
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -253,6 +255,7 @@ def edit_note(id):
         title = request.form.get('title')
         content = request.form.get('content')
         category_id = request.form.get('category_id')
+
         due_date = request.form.get('due_date')
         share = 'share' in request.form
         is_completed = request.form.get('is_completed') == '1' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'is_completed' in request.form
@@ -320,6 +323,7 @@ def edit_note(id):
                 'title': note.title,
                 'content': note.content,
                 'category_id': note.category_id,
+                'category_name': note.category.name,
                 'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
                 'share_id': note.share_id,
                 'is_completed': bool(note.is_completed),
@@ -330,6 +334,19 @@ def edit_note(id):
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
     return render_template('edit_note.html', note=note, categories=categories)
+
+@app.route('/get_image/<int:note_id>/<string:filename>')
+@login_required
+def get_image(note_id, filename):
+    note = Note.query.get_or_404(note_id)
+    if note.user_id != current_user.id:
+        return jsonify({'status': 'error', 'message': 'Unauthorized access.'}), 403
+    images = json.loads(note.images) if note.images else []
+    image = next((img for img in images if img['filename'] == filename), None)
+    if not image:
+        return jsonify({'status': 'error', 'message': 'Image not found.'}), 404
+    image_data = base64.b64decode(image['data'])
+    return send_file(BytesIO(image_data), mimetype=f'image/{filename.split(".")[-1].lower()}')
 
 @app.route('/toggle_complete/<int:id>', methods=['POST'])
 @login_required

@@ -5,14 +5,123 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tomo Memo Shared Note</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f8f9fa;
+        }
+        .note-content {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .note-title {
+            font-family: 'Kosugi Maru', sans-serif;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+        .note-images img {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+        .modal-body img {
+            max-width: 100%;
+            max-height: 80vh;
+            object-fit: contain;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-4">
-        <h2>{{ note.title }}</h2>
-        <p>{{ note.content }}</p>
-        {% if note.due_date %}
-            <p><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
-        {% endif %}
+        <div class="note-content">
+            <h2 class="note-title">{{ note.title }}</h2>
+            <p style="white-space: pre-wrap;">{{ note.content }}</p>
+            {% if note.due_date %}
+                <p><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
+            {% endif %}
+            {% if note.category %}
+                <p><small class="text-muted">Category: {{ note.category.name }}</small></p>
+            {% endif %}
+            <!-- Hiển thị ảnh -->
+            <div class="note-images mt-3 d-flex flex-wrap gap-2" id="noteImages">
+                <!-- Ảnh sẽ được thêm bằng JavaScript -->
+            </div>
+        </div>
     </div>
+
+    <!-- Modal để xem ảnh phóng to -->
+    <div class="modal fade" id="imageViewModal" tabindex="-1" aria-labelledby="imageViewModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="imageViewModalLabel">Image Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img id="enlargedImage" src="" alt="Enlarged Image">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Hàm hiển thị ảnh của note
+        function displayNoteImages() {
+            const noteImagesContainer = document.getElementById('noteImages');
+            noteImagesContainer.innerHTML = '';
+            // Lấy dữ liệu ảnh từ note
+            let images = {{ note.images | tojson | default('[]') | safe }};
+
+            // Đảm bảo images là mảng
+            if (typeof images === 'string' && images) {
+                try {
+                    images = JSON.parse(images);
+                } catch (e) {
+                    console.error('Error parsing images JSON:', e);
+                    images = [];
+                }
+            }
+            if (!Array.isArray(images)) {
+                console.warn('Images is not an array:', images);
+                images = [];
+            }
+
+            if (images.length) {
+                images.forEach(image => {
+                    const container = document.createElement('div');
+                    container.className = 'position-relative';
+                    const img = document.createElement('img');
+                    // Sử dụng base64 trực tiếp vì ảnh đã là JPEG
+                    img.src = `data:image/${image.filename.split('.').pop().toLowerCase()};base64,${image.data}`;
+                    img.style.maxWidth = '100px';
+                    img.style.maxHeight = '100px';
+                    img.style.objectFit = 'contain';
+                    img.classList.add('img-thumbnail');
+
+                    // Thêm sự kiện click để mở modal xem ảnh
+                    img.style.cursor = 'pointer';
+                    img.onclick = () => {
+                        const imageViewModal = new bootstrap.Modal(document.getElementById('imageViewModal'));
+                        document.getElementById('enlargedImage').src = img.src;
+                        imageViewModal.show();
+                    };
+
+                    container.appendChild(img);
+                    noteImagesContainer.appendChild(container);
+                });
+            }
+        }
+
+        // Gọi hàm hiển thị ảnh khi trang tải
+        document.addEventListener('DOMContentLoaded', displayNoteImages);
+    </script>
 </body>
 </html>
