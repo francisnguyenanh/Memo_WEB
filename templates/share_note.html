@@ -11,12 +11,26 @@
         body {
             font-family: 'Noto Sans JP', sans-serif;
             background-color: #f8f9fa;
+            margin: 0; /* Loại bỏ margin mặc định của body */
+            min-height: 100vh; /* Đảm bảo body chiếm toàn bộ chiều cao */
+            display: flex;
+            flex-direction: column;
+        }
+        .container {
+            flex-grow: 1; /* Container chiếm không gian còn lại */
+            display: flex;
+            flex-direction: column;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            max-width: 100%; /* Đảm bảo container không vượt quá màn hình */
         }
         .note-content {
             background-color: #ffffff;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            flex-grow: 1; /* Note-content chiếm không gian tối đa */
+            flex-direction: column;
         }
         .note-title {
             font-family: 'Kosugi Maru', sans-serif;
@@ -26,12 +40,13 @@
         .note-content p {
             white-space: pre-wrap; /* Đảm bảo giữ định dạng xuống dòng */
             word-wrap: break-word; /* Đảm bảo từ dài không làm tràn nội dung */
-            max-height: 300px; /* Giới hạn chiều cao tối đa */
-            overflow-y: auto; /* Thêm thanh cuộn dọc nếu nội dung quá dài */
-            padding: 15px; /* Thêm padding để nội dung trông gọn gàng */
-            border: 1px solid #ddd; /* Thêm viền nhẹ để rõ ràng hơn */
-            border-radius: 5px; /* Bo góc nhẹ */
-            background-color: #f8f9fa; /* Màu nền nhẹ để phân biệt */
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            flex-grow: 1; /* Nội dung p chiếm không gian còn lại */
+            overflow-y: auto; /* Thanh cuộn chỉ xuất hiện khi nội dung vượt quá */
+            margin-bottom: 1rem;
         }
         .note-images img {
             border: 1px solid #ddd;
@@ -40,7 +55,7 @@
             margin-right: 10px;
             margin-bottom: 10px;
             cursor: pointer;
-            max-width: 100px; /* Đảm bảo ảnh không vượt quá kích thước */
+            max-width: 100px;
             max-height: 100px;
             object-fit: contain;
         }
@@ -49,21 +64,27 @@
             max-height: 80vh;
             object-fit: contain;
         }
-        /* Đảm bảo responsive trên thiết bị di động */
+        /* Responsive trên thiết bị di động */
         @media (max-width: 576px) {
+            .container {
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
+            }
             .note-content {
-                padding: 15px; /* Giảm padding trên di động */
+                padding: 10px; /* Giảm padding trên mobile */
             }
             .note-title {
-                font-size: 1.5rem; /* Giảm kích thước tiêu đề trên di động */
+                font-size: 1.5rem; /* Giảm kích thước tiêu đề */
             }
             .note-content p {
-                font-size: 0.9rem; /* Giảm kích thước chữ trên di động */
-                max-height: 200px; /* Giảm chiều cao tối đa trên di động */
+                font-size: 0.875rem; /* Giảm kích thước chữ */
+                padding: 10px;
             }
             .note-images img {
-                max-width: 80px; /* Giảm kích thước ảnh trên di động */
+                max-width: 80px;
                 max-height: 80px;
+                margin-right: 8px;
+                margin-bottom: 8px;
             }
         }
     </style>
@@ -72,12 +93,12 @@
     <div class="container mt-4">
         <div class="note-content">
             <h2 class="note-title">{{ note.title }}</h2>
-            <p style="white-space: pre-wrap;">{{ note.content }}</p>
+            <p id="noteContent" style="white-space: pre-wrap;"></p>
             {% if note.due_date %}
-                <p><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
+                <p class="mb-1"><small class="text-muted">Due: {{ note.due_date.strftime('%Y-%m-%d %H:%M') }}</small></p>
             {% endif %}
             {% if note.category %}
-                <p><small class="text-muted">Category: {{ note.category.name }}</small></p>
+                <p class="mb-1"><small class="text-muted">Category: {{ note.category.name }}</small></p>
             {% endif %}
             <!-- Hiển thị ảnh -->
             <div class="note-images mt-3 d-flex flex-wrap gap-2" id="noteImages">
@@ -103,14 +124,25 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Hàm chuyển đổi URL thành liên kết có thể nhấp
+        function linkify(text) {
+            const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]\}])/g;
+            return text.replace(urlRegex, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
+        }
+
+        // Hàm hiển thị nội dung ghi nhớ với các liên kết
+        function displayNoteContent() {
+            const noteContentElement = document.getElementById('noteContent');
+            const noteContent = {{ note.content | tojson | safe }};
+            noteContentElement.innerHTML = linkify(noteContent);
+        }
+
         // Hàm hiển thị ảnh của note
         function displayNoteImages() {
             const noteImagesContainer = document.getElementById('noteImages');
             noteImagesContainer.innerHTML = '';
-            // Lấy dữ liệu ảnh từ note
             let images = {{ note.images | tojson | default('[]') | safe }};
 
-            // Đảm bảo images là mảng
             if (typeof images === 'string' && images) {
                 try {
                     images = JSON.parse(images);
@@ -129,14 +161,12 @@
                     const container = document.createElement('div');
                     container.className = 'position-relative';
                     const img = document.createElement('img');
-                    // Sử dụng base64 trực tiếp vì ảnh đã là JPEG
                     img.src = `data:image/${image.filename.split('.').pop().toLowerCase()};base64,${image.data}`;
                     img.style.maxWidth = '100px';
                     img.style.maxHeight = '100px';
                     img.style.objectFit = 'contain';
                     img.classList.add('img-thumbnail');
 
-                    // Thêm sự kiện click để mở modal xem ảnh
                     img.style.cursor = 'pointer';
                     img.onclick = () => {
                         const imageViewModal = new bootstrap.Modal(document.getElementById('imageViewModal'));
@@ -150,8 +180,11 @@
             }
         }
 
-        // Gọi hàm hiển thị ảnh khi trang tải
-        document.addEventListener('DOMContentLoaded', displayNoteImages);
+        // Gọi các hàm hiển thị nội dung và ảnh khi trang tải
+        document.addEventListener('DOMContentLoaded', () => {
+            displayNoteContent();
+            displayNoteImages();
+        });
     </script>
 </body>
 </html>

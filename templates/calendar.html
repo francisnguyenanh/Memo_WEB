@@ -81,10 +81,6 @@
         .navbar {
             background-color: var(--card-bg);
         }
-        .modal-content {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-        }
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
@@ -176,6 +172,33 @@
                 min-width: 44px;
                 min-height: 44px;
             }
+        }
+
+        /* View Memo Modal Styles */
+        #viewMemoModal .modal-body {
+            font-family: 'Noto Sans JP', sans-serif;
+        }
+        #viewMemoModal #viewMemoTitle {
+            font-family: 'Kosugi Maru', sans-serif;
+            font-size: 1.5rem;
+        }
+        #viewMemoModal #viewMemoContent {
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 5px;
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 1px solid #ddd;
+        }
+        #viewMemoModal #viewMemoImages img {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -326,6 +349,31 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- View Memo Modal -->
+    <div class="modal fade" id="viewMemoModal" tabindex="-1" aria-labelledby="viewMemoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewMemoModalLabel">View Memo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6 id="viewMemoTitle" class="mb-3"></h6>
+                    <p id="viewMemoContent" style="white-space: pre-wrap;"></p>
+                    <div id="viewMemoImages" class="mt-2 d-flex flex-wrap gap-2"></div>
+                    <p id="viewMemoDueDate" class="text-muted"></p>
+                    <p id="viewMemoCategory" class="text-muted"></p>
+                    <p id="viewMemoShare" class="text-muted"></p>
+                    <p id="viewMemoCompleted" class="text-muted"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="editFromViewButton">Edit</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- Modal để xem ảnh phóng to -->
     <div class="modal fade" id="imageViewModal" tabindex="-1" aria-labelledby="imageViewModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -655,7 +703,7 @@
                 slotMinTime: '04:00:00',
                 slotMaxTime: '23:00:00',
                 eventClick: function(info) {
-                    openEditMemoModal(info.event.id);
+                    openViewMemoModal(info.event.id);
                 },
                 dateClick: function(info) {
                     const jstDate = new Date(info.date.getTime() + 9 * 60 * 60 * 1000);
@@ -676,6 +724,114 @@
                 eventDurationEditable: true
             });
             calendar.render();
+
+            // Hàm chuyển đổi URL thành liên kết có thể nhấp
+            function linkify(text) {
+                const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]\}])/g;
+                return text.replace(urlRegex, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
+            }
+
+            // Hàm mở và điền dữ liệu vào viewMemoModal
+            // Hàm mở và điền dữ liệu vào viewMemoModal
+            async function openViewMemoModal(noteId) {
+                try {
+                    const response = await fetch(`/edit_note/${noteId}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+                    const data = await response.json();
+                    if (data.status === 'success') {
+                        const note = data.note;
+                        const viewMemoModal = new bootstrap.Modal(document.getElementById('viewMemoModal'));
+
+                        // Điền dữ liệu vào các trường
+                        document.getElementById('viewMemoTitle').textContent = note.title;
+                        document.getElementById('viewMemoContent').innerHTML = linkify(note.content);
+                        document.getElementById('viewMemoDueDate').textContent = note.due_date ? `Due: ${formatDateJST(note.due_date)}` : '';
+                        document.getElementById('viewMemoCategory').textContent = `Category: ${note.category_name ? note.category_name : 'None'}`;
+                        document.getElementById('viewMemoShare').innerHTML = note.share_id ? `Share: <a href="{{ url_for('share_note', share_id='') }}${note.share_id}" target="_blank">Link</a>` : '';
+                        document.getElementById('viewMemoCompleted').textContent = `Status: ${note.is_completed ? 'Completed' : 'Incomplete'}`;
+
+                        // Hiển thị hình ảnh
+                        const viewMemoImages = document.getElementById('viewMemoImages');
+                        viewMemoImages.innerHTML = '';
+                        if (note.images && note.images.length > 0) {
+                            for (const image of note.images) {
+                                const container = document.createElement('div');
+                                container.className = 'position-relative';
+                                const img = document.createElement('img');
+                                if (image.filename.toLowerCase().endsWith('.heic')) {
+                                    // Chuyển đổi HEIC sang JPEG với 1/3 chất lượng
+                                    try {
+                                        const response = await fetch(`/get_image/${note.id}/${image.filename}`);
+                                        const blob = await response.blob();
+                                        const convertedBlob = await heic2any({
+                                            blob: blob,
+                                            toType: 'image/jpeg',
+                                            quality: 0.05 // Giảm chất lượng xuống 1/3
+                                        });
+                                        img.src = URL.createObjectURL(convertedBlob);
+                                    } catch (err) {
+                                        console.error('HEIC conversion error:', err);
+                                        img.alt = 'Cannot display HEIC image';
+                                    }
+                                } else {
+                                    img.src = `data:image/${image.filename.split('.').pop().toLowerCase()};base64,${image.data}`;
+                                }
+                                img.style.maxWidth = '100px';
+                                img.style.maxHeight = '100px';
+                                img.style.objectFit = 'contain';
+                                img.classList.add('img-thumbnail');
+                                img.style.cursor = 'pointer';
+                                img.onclick = () => {
+                                    document.getElementById('enlargedImage').src = img.src;
+                                    imageViewModal.show();
+                                };
+                                container.appendChild(img);
+                                viewMemoImages.appendChild(container);
+                            }
+                        }
+
+                        // Thiết lập nút "Edit"
+                        const editFromViewButton = document.getElementById('editFromViewButton');
+                        editFromViewButton.onclick = () => {
+                            viewMemoModal.hide();
+                            openEditMemoModal(noteId);
+                        };
+
+                        viewMemoModal.show();
+                    } else {
+                        showFlashMessage('danger', 'Failed to load note data: ' + (data.message || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Error loading note:', error);
+                    showFlashMessage('danger', 'Error loading note: ' + error.message);
+                }
+            }
+
+            // Format date to yyyy/mm/dd (aaa) HH:MM in JST
+            function formatDateJST(isoDate) {
+                if (!isoDate) return '';
+                const date = new Date(isoDate);
+                const options = {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    weekday: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'Asia/Tokyo'
+                };
+                const formatter = new Intl.DateTimeFormat('ja-JP', options);
+                const parts = formatter.formatToParts(date);
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const weekday = parts.find(p => p.type === 'weekday').value;
+                const hour = parts.find(p => p.type === 'hour').value;
+                const minute = parts.find(p => p.type === 'minute').value;
+                return `${year}/${month}/${day} (${weekday}) ${hour}:${minute}`;
+            }
 
             // Hàm mở và điền dữ liệu vào editMemoModal
             async function openEditMemoModal(noteId) {

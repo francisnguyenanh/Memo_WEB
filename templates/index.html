@@ -1423,77 +1423,78 @@
 
         // Function to open view memo modal
         async function openViewMemoModal(noteId) {
-        try {
-            const response = await fetch(`/edit_note/${noteId}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await response.json();
-            if (data.status === 'success') {
-                const note = data.note;
-                document.getElementById('viewMemoTitle').textContent = note.title;
-                document.getElementById('viewMemoContent').textContent = note.content;
-                document.getElementById('viewMemoDueDate').textContent = note.due_date ? `Due: ${formatDateJST(note.due_date)}` : '';
-                document.getElementById('viewMemoCategory').textContent = `Category: ${note.category_name ? note.category_name : 'None'}`;
-                document.getElementById('viewMemoShare').innerHTML = note.share_id ? `Share: <a href="{{ url_for('share_note', share_id='') }}${note.share_id}" target="_blank">Link</a>` : '';
-                document.getElementById('viewMemoCompleted').textContent = `Status: ${note.is_completed ? 'Completed' : 'Incomplete'}`;
+            try {
+                const response = await fetch(`/edit_note/${noteId}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const note = data.note;
+                    document.getElementById('viewMemoTitle').textContent = note.title;
+                    // Chuyển đổi nội dung với các liên kết
+                    document.getElementById('viewMemoContent').innerHTML = linkify(note.content);
+                    document.getElementById('viewMemoDueDate').textContent = note.due_date ? `Due: ${formatDateJST(note.due_date)}` : '';
+                    document.getElementById('viewMemoCategory').textContent = `Category: ${note.category_name ? note.category_name : 'None'}`;
+                    document.getElementById('viewMemoShare').innerHTML = note.share_id ? `Share: <a href="{{ url_for('share_note', share_id='') }}${note.share_id}" target="_blank">Link</a>` : '';
+                    document.getElementById('viewMemoCompleted').textContent = `Status: ${note.is_completed ? 'Completed' : 'Incomplete'}`;
 
-                // Hiển thị ảnh
-                const viewMemoImages = document.getElementById('viewMemoImages');
-                viewMemoImages.innerHTML = '';
-                if (note.images && note.images.length) {
-                    for (const image of note.images) {
-                        const container = document.createElement('div');
-                        container.className = 'position-relative';
-                        const img = document.createElement('img');
-                        if (image.filename.toLowerCase().endsWith('.heic')) {
-                            // Chuyển đổi HEIC sang JPEG với 1/3 chất lượng
-                            const response = await fetch(`/get_image/${note.id}/${image.filename}`);
-                            const blob = await response.blob();
-                            try {
-                                const convertedBlob = await heic2any({
-                                    blob: blob,
-                                    toType: 'image/jpeg',
-                                    quality: 0.05 // Giảm chất lượng xuống 1/3
-                                });
-                                img.src = URL.createObjectURL(convertedBlob);
-                            } catch (err) {
-                                console.error('HEIC conversion error:', err);
-                                img.alt = 'Cannot display HEIC image';
+                    // Hiển thị ảnh
+                    const viewMemoImages = document.getElementById('viewMemoImages');
+                    viewMemoImages.innerHTML = '';
+                    if (note.images && note.images.length) {
+                        for (const image of note.images) {
+                            const container = document.createElement('div');
+                            container.className = 'position-relative';
+                            const img = document.createElement('img');
+                            if (image.filename.toLowerCase().endsWith('.heic')) {
+                                // Chuyển đổi HEIC sang JPEG với 1/3 chất lượng
+                                const response = await fetch(`/get_image/${note.id}/${image.filename}`);
+                                const blob = await response.blob();
+                                try {
+                                    const convertedBlob = await heic2any({
+                                        blob: blob,
+                                        toType: 'image/jpeg',
+                                        quality: 0.05 // Giảm chất lượng xuống 1/3
+                                    });
+                                    img.src = URL.createObjectURL(convertedBlob);
+                                } catch (err) {
+                                    console.error('HEIC conversion error:', err);
+                                    img.alt = 'Cannot display HEIC image';
+                                }
+                            } else {
+                                img.src = `data:image/${image.filename.split('.').pop()};base64,${image.data}`;
                             }
-                        } else {
-                            img.src = `data:image/${image.filename.split('.').pop()};base64,${image.data}`;
+                            img.style.maxWidth = '100px';
+                            img.style.maxHeight = '100px';
+                            img.style.objectFit = 'contain';
+                            img.classList.add('img-thumbnail');
+                            img.style.cursor = 'pointer';
+                            img.onclick = () => {
+                                const imageViewModal = new bootstrap.Modal(document.getElementById('imageViewModal'));
+                                document.getElementById('enlargedImage').src = img.src;
+                                imageViewModal.show();
+                            };
+                            container.appendChild(img);
+                            viewMemoImages.appendChild(container);
                         }
-                        img.style.maxWidth = '100px';
-                        img.style.maxHeight = '100px';
-                        img.style.objectFit = 'contain';
-                        img.classList.add('img-thumbnail');
-                        img.style.cursor = 'pointer';
-                        img.onclick = () => {
-                            const imageViewModal = new bootstrap.Modal(document.getElementById('imageViewModal'));
-                            document.getElementById('enlargedImage').src = img.src;
-                            imageViewModal.show();
-                        };
-                        container.appendChild(img);
-                        viewMemoImages.appendChild(container);
                     }
+
+                    // Set up edit button in view modal
+                    const editFromViewButton = document.getElementById('editFromViewButton');
+                    editFromViewButton.onclick = () => {
+                        viewMemoModal.hide();
+                        openEditMemoModal(noteId);
+                    };
+
+                    viewMemoModal.show();
+                } else {
+                    showFlashMessage('danger', data.message || 'Failed to load note data.');
                 }
-
-                // Set up edit button in view modal
-                const editFromViewButton = document.getElementById('editFromViewButton');
-                editFromViewButton.onclick = () => {
-                    viewMemoModal.hide();
-                    openEditMemoModal(noteId);
-                };
-
-                viewMemoModal.show();
-            } else {
-                showFlashMessage('danger', data.message || 'Failed to load note data.');
+            } catch (error) {
+                console.error('Error loading note:', error);
+                showFlashMessage('danger', 'Error loading note.');
             }
-        } catch (error) {
-            console.error('Error loading note:', error);
-            showFlashMessage('danger', 'Error loading note.');
         }
-    }
 
         // Update event listeners for notes
         function updateNotesEventListeners() {
@@ -1553,6 +1554,12 @@
             } catch (error) {
                 console.error('Search error:', error);
             }
+        }
+
+        // Hàm chuyển đổi URL thành liên kết có thể nhấp
+        function linkify(text) {
+            const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,:;"')\]\}])/g;
+            return text.replace(urlRegex, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
         }
 
         updateNotesEventListeners();
