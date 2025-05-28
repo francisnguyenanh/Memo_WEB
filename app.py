@@ -17,6 +17,11 @@ from datetime import datetime, timedelta  # Added timedelta
 from uuid import uuid4  # Added uuid4
 from base64 import b64encode
 import json
+from base64 import b64encode
+from wand.image import Image
+import io
+import threading
+import unicodedata
 
 
 app = Flask(__name__)
@@ -143,6 +148,17 @@ def index():
         now=now
     )
 
+def normalize_filename(filename):
+    if not filename or not isinstance(filename, str):
+        return 'image.jpg'
+    # Chuẩn hóa Unicode về dạng NFKC để xử lý ký tự tiếng Nhật
+    normalized = unicodedata.normalize('NFKC', filename)
+    # Thay thế ký tự không an toàn
+    safe_name = ''.join(c if c.isalnum() or c in '._-\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF' else '_' for c in normalized)
+    # Loại bỏ nhiều dấu chấm và dấu chấm cuối
+    safe_name = safe_name.replace('..', '.').rstrip('.')
+    return safe_name or 'image.jpg'
+
 @app.route('/add_note', methods=['GET', 'POST'])
 @login_required
 def add_note():
@@ -193,26 +209,7 @@ def add_note():
                         return jsonify({'status': 'error', 'message': 'Invalid due date format'}), 400
                     return redirect(url_for('index'))
 
-            # Handle image uploads
-            images = []
-            files = request.files.getlist('images')
-            for file in files:
-                if file and file.filename:
-                    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
-                    if os.path.splitext(file.filename.lower())[1] in allowed_extensions:
-                        image_data = file.read()
-                        image_base64 = b64encode(image_data).decode('utf-8')
-                        images.append({
-                            'filename': file.filename,
-                            'data': image_base64
-                        })
-                    else:
-                        flash(f'File {file.filename} is not an allowed image type.', 'danger')
-                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                            return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
-                        return redirect(url_for('index'))
-
-            categories = Category.query.filter_by(user_id=current_user.id).all()
+            # Lưu memo trước
             note = Note(
                 title=title,
                 content=content,
@@ -221,12 +218,61 @@ def add_note():
                 due_date=due_date_utc,
                 share_id=str(uuid4()) if share else None,
                 is_completed=is_completed,
-                images=json.dumps(images) if images else None
+                images=None
             )
             db.session.add(note)
             db.session.commit()
-            flash('Note added successfully!', 'success')
 
+            # Hàm xử lý ảnh bất đồng bộ
+            def process_images(note_id, files):
+                with app.app_context():
+                    app.logger.debug(f"Processing images for note_id {note_id}, files: {[f.filename for f in files]}")
+                    images = []
+                    for file in files:
+                        if file and file.filename:
+                            allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                            normalized_filename = normalize_filename(file.filename)
+                            ext = os.path.splitext(normalized_filename.lower())[1]
+                            if ext in allowed_extensions:
+                                try:
+                                    if ext == '.heic':
+                                        with Image(file=file) as img:
+                                            img.format = 'jpeg'
+                                            img.compression_quality = 20
+                                            output = io.BytesIO()
+                                            img.save(file=output)
+                                            image_data = output.getvalue()
+                                        filename = normalized_filename.replace('.heic', '.jpg')
+                                    else:
+                                        image_data = file.read()
+                                        filename = normalized_filename
+                                    image_base64 = b64encode(image_data).decode('utf-8')
+                                    images.append({
+                                        'filename': filename,
+                                        'data': image_base64
+                                    })
+                                except Exception as e:
+                                    app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
+                            else:
+                                app.logger.warning(f"Invalid file type: {normalized_filename}")
+                    if images:
+                        try:
+                            note = Note.query.get(note_id)
+                            note.images = json.dumps(images)
+                            db.session.commit()
+                            app.logger.debug(f"Images saved for note_id {note_id}: {len(images)} images")
+                        except Exception as e:
+                            app.logger.error(f"Error saving images to DB for note_id {note_id}: {str(e)}")
+
+            # Lấy danh sách file và xử lý bất đồng bộ
+            files = request.files.getlist('images')
+            app.logger.debug(f"Received files: {[f.filename for f in files if f.filename]}")
+            if files and any(file.filename for file in files):
+                threading.Thread(target=process_images, args=(note.id, files)).start()
+            else:
+                app.logger.debug("No valid image files received")
+
+            flash('Note added successfully!', 'success')
 
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({
@@ -240,24 +286,21 @@ def add_note():
                         'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
                         'share_id': note.share_id,
                         'is_completed': bool(note.is_completed),
-                        'images': images
+                        'images': []  # Trả về mảng rỗng vì ảnh đang được xử lý
                     },
-                    'categories': [{'id': c.id, 'name': c.name} for c in
-                                   Category.query.filter_by(user_id=current_user.id).all()]
+                    'categories': [{'id': c.id, 'name': c.name} for c in Category.query.filter_by(user_id=current_user.id).all()]
                 })
             return redirect(url_for('index'))
 
-
-
-
         except Exception as e:
+            app.logger.error(f"Error in add_note: {str(e)}")
             flash('An error occurred while adding the note.', 'danger')
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
             return redirect(url_for('index'))
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
-    return  redirect(url_for('index'))
+    return redirect(url_for('index'))
 
 
 
@@ -272,67 +315,147 @@ def edit_note(id):
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        title = request.form.get('title')
-        content = request.form.get('content')
-        category_id = request.form.get('category_id')
+        try:
+            title = request.form.get('title')
+            content = request.form.get('content')
+            category_id = request.form.get('category_id')
+            due_date = request.form.get('due_date')
+            share = request.form.get('share') == '1'
+            is_completed = request.form.get('is_completed') == '1'
 
-        due_date = request.form.get('due_date')
-        share = 'share' in request.form
-        is_completed = request.form.get('is_completed') == '1' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'is_completed' in request.form
+            # Validate required fields
+            if not title:
+                flash('Title is required.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Title is required'}), 400
+                return redirect(url_for('index'))
 
-        # Validate category
-        categories = Category.query.filter_by(user_id=current_user.id).all()
-        if not categories:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'No categories available. Please create a category first.'}), 400
-            flash('No categories available. Please create a category first.', 'danger')
-            return redirect(url_for('index'))
-        if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'status': 'error', 'message': 'Please select a valid category.'}), 400
-            flash('Please select a valid category.', 'danger')
-            return redirect(url_for('index'))
+            if not content:
+                flash('Content is required.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Content is required'}), 400
+                return redirect(url_for('index'))
 
-        # Handle image uploads
-        images = json.loads(note.images) if note.images else []
-        keep_images = request.form.getlist('keep_images')  # List of indices of images to keep
-        if keep_images:
-            keep_indices = [int(i) for i in keep_images]
-            images = [images[i] for i in keep_indices if i < len(images)]
-        else:
-            images = []
+            # Validate category
+            categories = Category.query.filter_by(user_id=current_user.id).all()
+            if not categories:
+                flash('No categories available. Please create a category first.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'No categories available'}), 400
+                return redirect(url_for('index'))
+            if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
+                flash('Please select a valid category.', 'danger')
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'status': 'error', 'message': 'Invalid category'}), 400
+                return redirect(url_for('index'))
 
-        files = request.files.getlist('images')
-        for file in files:
-            if file and file.filename:
-                allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
-                if os.path.splitext(file.filename.lower())[1] in allowed_extensions:
-                    image_data = file.read()
-                    image_base64 = b64encode(image_data).decode('utf-8')
-                    images.append({
-                        'filename': file.filename,
-                        'data': image_base64
-                    })
-                else:
-                    flash(f'File {file.filename} is not an allowed image type.', 'danger')
+            # Parse due_date
+            due_date_utc = None
+            if due_date:
+                try:
+                    due_date_obj = datetime.strptime(due_date, '%Y-%m-%dT%H:%M')
+                    due_date_utc = due_date_obj - timedelta(hours=9)  # Convert JST to UTC
+                except ValueError as e:
+                    flash('Invalid due date format.', 'danger')
                     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
+                        return jsonify({'status': 'error', 'message': 'Invalid due date format'}), 400
                     return redirect(url_for('index'))
 
-        note.title = title
-        note.content = content
-        note.category_id = category_id
-        note.due_date = datetime.strptime(due_date, '%Y-%m-%dT%H:%M') if due_date else None
-        note.share_id = str(uuid.uuid4()) if share and not note.share_id else note.share_id if share else None
-        note.is_completed = is_completed
-        note.images = json.dumps(images) if images else None
-        db.session.commit()
+            # Cập nhật thông tin memo
+            note.title = title
+            note.content = content
+            note.category_id = category_id
+            note.due_date = due_date_utc
+            note.share_id = str(uuid4()) if share and not note.share_id else note.share_id if share else None
+            note.is_completed = is_completed
 
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return jsonify({'status': 'success', 'message': 'Note updated successfully!'})
+            # Xử lý ảnh hiện có
+            images = json.loads(note.images) if note.images else []
+            keep_images = request.form.getlist('keep_images')
+            app.logger.debug(f"Keep images indices: {keep_images}")
+            if keep_images:
+                keep_indices = [int(i) for i in keep_images if i.isdigit() and int(i) < len(images)]
+                images = [images[i] for i in keep_indices]
+            else:
+                images = images if images else []  # Giữ nguyên nếu không có keep_images
 
-        flash('Note updated successfully!', 'success')
-        return redirect(url_for('index'))
+            # Lưu memo trước khi xử lý ảnh mới
+            note.images = json.dumps(images) if images else None
+            db.session.commit()
+
+            # Hàm xử lý ảnh mới bất đồng bộ
+            def process_new_images(note_id, files, existing_images):
+                with app.app_context():
+                    app.logger.debug(f"Processing new images for note_id {note_id}, files: {[f.filename for f in files]}")
+                    new_images = existing_images[:] if existing_images else []
+                    for file in files:
+                        if file and file.filename:
+                            allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                            normalized_filename = normalize_filename(file.filename)
+                            ext = os.path.splitext(normalized_filename.lower())[1]
+                            if ext in allowed_extensions:
+                                try:
+                                    if ext == '.heic':
+                                        with Image(file=file) as img:
+                                            img.format = 'jpeg'
+                                            img.compression_quality = 20
+                                            output = io.BytesIO()
+                                            img.save(file=output)
+                                            image_data = output.getvalue()
+                                        filename = normalized_filename.replace('.heic', '.jpg')
+                                    else:
+                                        image_data = file.read()
+                                        filename = normalized_filename
+                                    image_base64 = b64encode(image_data).decode('utf-8')
+                                    new_images.append({
+                                        'filename': filename,
+                                        'data': image_base64
+                                    })
+                                except Exception as e:
+                                    app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
+                            else:
+                                app.logger.warning(f"Invalid file type: {normalized_filename}")
+                    try:
+                        note = Note.query.get(note_id)
+                        note.images = json.dumps(new_images) if new_images else None
+                        db.session.commit()
+                        app.logger.debug(f"Images saved for note_id {note_id}: {len(new_images)} images")
+                    except Exception as e:
+                        app.logger.error(f"Error saving images to DB for note_id {note_id}: {str(e)}")
+
+            # Lấy danh sách file mới và xử lý bất đồng bộ
+            files = request.files.getlist('images')
+            app.logger.debug(f"Received files for edit: {[f.filename for f in files if f.filename]}")
+            if files and any(file.filename for file in files):
+                threading.Thread(target=process_new_images, args=(note.id, files, images)).start()
+            else:
+                app.logger.debug("No valid new image files received")
+
+            flash('Note updated successfully!', 'success')
+
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({
+                    'status': 'success',
+                    'note': {
+                        'id': note.id,
+                        'title': note.title,
+                        'content': note.content,
+                        'category_id': note.category_id,
+                        'category_name': note.category.name,
+                        'due_date': note.due_date.strftime('%Y-%m-%dT%H:%M') if note.due_date else '',
+                        'share_id': note.share_id,
+                        'is_completed': bool(note.is_completed),
+                        'images': images
+                    }
+                })
+            return redirect(url_for('index'))
+
+        except Exception as e:
+            app.logger.error(f"Error in edit_note: {str(e)}")
+            flash('An error occurred while updating the note.', 'danger')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
+            return redirect(url_for('index'))
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         images = json.loads(note.images) if note.images else []
