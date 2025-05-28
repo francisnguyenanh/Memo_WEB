@@ -220,6 +220,11 @@
             padding: 15px;
             border-radius: 5px;
             min-height: 100px;
+            max-height: 300px; /* Giới hạn chiều cao tối đa */
+            overflow-y: auto; /* Cho phép cuộn dọc khi nội dung vượt quá */
+            white-space: pre-wrap; /* Đảm bảo xuống hàng tự nhiên và giữ định dạng */
+            word-wrap: break-word; /* Đảm bảo từ dài không làm tràn nội dung */
+            border: 1px solid #ddd; /* Thêm viền nhẹ để rõ ràng hơn */
         }
         #imagePreview img, #editImagePreview img, #viewMemoImages img {
             border: 1px solid #ddd;
@@ -234,6 +239,13 @@
         .position-relative .btn-danger {
             padding: 2px 6px;
             font-size: 12px;
+        }
+        #viewMemoModal #viewMemoImages img {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
 
     </style>

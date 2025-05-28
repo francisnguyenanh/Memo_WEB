@@ -160,13 +160,13 @@ def add_note():
                 flash('Title is required.', 'danger')
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return jsonify({'status': 'error', 'message': 'Title is required'}), 400
-                return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+                return redirect(url_for('index'))
 
             if not content:
                 flash('Content is required.', 'danger')
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return jsonify({'status': 'error', 'message': 'Content is required'}), 400
-                return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+                return redirect(url_for('index'))
 
             # Validate category
             categories = Category.query.filter_by(user_id=current_user.id).all()
@@ -174,12 +174,12 @@ def add_note():
                 flash('No categories available. Please create a category first.', 'danger')
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return jsonify({'status': 'error', 'message': 'No categories available'}), 400
-                return redirect(url_for('add_category'))
+                return redirect(url_for('index'))
             if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
                 flash('Please select a valid category.', 'danger')
                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                     return jsonify({'status': 'error', 'message': 'Invalid category'}), 400
-                return render_template('add_note.html', categories=categories)
+                return redirect(url_for('index'))
 
             # Parse due_date
             due_date_utc = None
@@ -191,7 +191,7 @@ def add_note():
                     flash('Invalid due date format.', 'danger')
                     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                         return jsonify({'status': 'error', 'message': 'Invalid due date format'}), 400
-                    return render_template('add_note.html', categories=categories)
+                    return redirect(url_for('index'))
 
             # Handle image uploads
             images = []
@@ -210,7 +210,7 @@ def add_note():
                         flash(f'File {file.filename} is not an allowed image type.', 'danger')
                         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                             return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
-                        return render_template('add_note.html', categories=categories)
+                        return redirect(url_for('index'))
 
             categories = Category.query.filter_by(user_id=current_user.id).all()
             note = Note(
@@ -254,10 +254,10 @@ def add_note():
             flash('An error occurred while adding the note.', 'danger')
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'error', 'message': f'Server error: {str(e)}'}), 500
-            return render_template('add_note.html', categories=Category.query.filter_by(user_id=current_user.id).all())
+            return redirect(url_for('index'))
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
-    return render_template('add_note.html', categories=categories)
+    return  redirect(url_for('index'))
 
 
 
@@ -286,12 +286,12 @@ def edit_note(id):
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'error', 'message': 'No categories available. Please create a category first.'}), 400
             flash('No categories available. Please create a category first.', 'danger')
-            return redirect(url_for('add_category'))
+            return redirect(url_for('index'))
         if not category_id or not Category.query.filter_by(id=category_id, user_id=current_user.id).first():
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'status': 'error', 'message': 'Please select a valid category.'}), 400
             flash('Please select a valid category.', 'danger')
-            return render_template('edit_note.html', note=note, categories=categories)
+            return redirect(url_for('index'))
 
         # Handle image uploads
         images = json.loads(note.images) if note.images else []
@@ -317,7 +317,7 @@ def edit_note(id):
                     flash(f'File {file.filename} is not an allowed image type.', 'danger')
                     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                         return jsonify({'status': 'error', 'message': f'File {file.filename} is not an allowed image type.'}), 400
-                    return render_template('edit_note.html', note=note, categories=categories)
+                    return redirect(url_for('index'))
 
         note.title = title
         note.content = content
@@ -353,7 +353,7 @@ def edit_note(id):
         })
 
     categories = Category.query.filter_by(user_id=current_user.id).all()
-    return render_template('edit_note.html', note=note, categories=categories)
+    return redirect(url_for('index'))
 
 @app.route('/get_image/<int:note_id>/<string:filename>')
 @login_required

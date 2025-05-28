@@ -23,6 +23,16 @@
             font-size: 1.8rem;
             margin-bottom: 1rem;
         }
+        .note-content p {
+            white-space: pre-wrap; /* Đảm bảo giữ định dạng xuống dòng */
+            word-wrap: break-word; /* Đảm bảo từ dài không làm tràn nội dung */
+            max-height: 300px; /* Giới hạn chiều cao tối đa */
+            overflow-y: auto; /* Thêm thanh cuộn dọc nếu nội dung quá dài */
+            padding: 15px; /* Thêm padding để nội dung trông gọn gàng */
+            border: 1px solid #ddd; /* Thêm viền nhẹ để rõ ràng hơn */
+            border-radius: 5px; /* Bo góc nhẹ */
+            background-color: #f8f9fa; /* Màu nền nhẹ để phân biệt */
+        }
         .note-images img {
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -30,11 +40,31 @@
             margin-right: 10px;
             margin-bottom: 10px;
             cursor: pointer;
+            max-width: 100px; /* Đảm bảo ảnh không vượt quá kích thước */
+            max-height: 100px;
+            object-fit: contain;
         }
         .modal-body img {
             max-width: 100%;
             max-height: 80vh;
             object-fit: contain;
+        }
+        /* Đảm bảo responsive trên thiết bị di động */
+        @media (max-width: 576px) {
+            .note-content {
+                padding: 15px; /* Giảm padding trên di động */
+            }
+            .note-title {
+                font-size: 1.5rem; /* Giảm kích thước tiêu đề trên di động */
+            }
+            .note-content p {
+                font-size: 0.9rem; /* Giảm kích thước chữ trên di động */
+                max-height: 200px; /* Giảm chiều cao tối đa trên di động */
+            }
+            .note-images img {
+                max-width: 80px; /* Giảm kích thước ảnh trên di động */
+                max-height: 80px;
+            }
         }
     </style>
 </head>
