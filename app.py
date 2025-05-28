@@ -302,10 +302,6 @@ def add_note():
     categories = Category.query.filter_by(user_id=current_user.id).all()
     return redirect(url_for('index'))
 
-
-
-
-
 @app.route('/edit_note/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_note(id):
