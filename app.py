@@ -304,6 +304,8 @@ def add_note():
 
 
 
+
+
 @app.route('/edit_note/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_note(id):
