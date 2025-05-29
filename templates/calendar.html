@@ -702,13 +702,15 @@
                     openViewMemoModal(info.event.id);
                 },
                 dateClick: function(info) {
-                    // Lấy ngày user chọn
+                    // Lấy ngày user chọn (UTC)
                     const selectedDate = new Date(info.date);
-                    // Đặt giờ thành 23:00
+                    // Đặt giờ thành 23:00 (vẫn ở UTC)
                     selectedDate.setHours(23, 0, 0, 0);
-                    // Định dạng yyyy-MM-ddTHH:mm cho input datetime-local
-                    const dateStr = selectedDate.toISOString().slice(0, 16);
-                    memoDueDateInput.value = dateStr;
+
+                    // Chuyển sang local time string cho input datetime-local
+                    const local = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000);
+                    const dateStr = local.toISOString().slice(0, 16);
+
                     document.getElementById('addMemoForm').reset();
                     memoDueDateInput.value = dateStr;
                     addMemoModal.show();
