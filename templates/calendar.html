@@ -473,6 +473,9 @@
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/interaction/main.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            let selectedFilesAdd = [];
+            let selectedFilesEdit = [];
+            let existingImagesEdit = [];
             // Theme switching và điều chỉnh màu chữ
             const themeSelect = document.getElementById('themeSelect');
             const currentTheme = localStorage.getItem('theme') || 'light';
@@ -571,7 +574,7 @@
             // Hàm hiển thị preview ảnh với nút xóa
             function updateImagePreview(previewContainer, files, isAddModal) {
                 previewContainer.innerHTML = '';
-                files.forEach((file, index) => {
+                files.forEach((fileObj, index) => {
                     const container = document.createElement('div');
                     container.className = 'position-relative';
                     const img = document.createElement('img');
@@ -600,7 +603,7 @@
                             }
                         };
                         container.appendChild(deleteBtn);
-                        // Thêm sự kiện click để xem ảnh phóng to
+                        // Click để xem ảnh lớn
                         img.onclick = () => {
                             document.getElementById('enlargedImage').src = src;
                             imageViewModal.show();
@@ -608,38 +611,27 @@
                         previewContainer.appendChild(container);
                     };
 
-                    if (typeof file === 'string') {
-                        // Ảnh hiện có (base64)
-                        setImageSource(file);
+                    if (typeof fileObj === 'string') {
+                        setImageSource(fileObj);
                     } else {
-                        setImageSource(URL.createObjectURL(file));
+                        setImageSource(URL.createObjectURL(fileObj));
                     }
                 });
             }
 
             // Xử lý chọn ảnh trong addMemoModal
-            document.getElementById('memoImages').addEventListener('change', async function(e) {
+            document.getElementById('memoImages').addEventListener('change', function(e) {
                 const imagePreview = document.getElementById('imagePreview');
                 const files = Array.from(e.target.files);
-                for (const file of files) {
-                    const processedFile = await processImage(file);
-                    if (processedFile) {
-                        selectedFilesAdd.push(processedFile);
-                    }
-                }
+                selectedFilesAdd = [...selectedFilesAdd, ...files];
                 updateImagePreview(imagePreview, selectedFilesAdd, true);
             });
 
             // Xử lý chọn ảnh trong editMemoModal
-            document.getElementById('editMemoImages').addEventListener('change', async function(e) {
+            document.getElementById('editMemoImages').addEventListener('change', function(e) {
                 const editImagePreview = document.getElementById('editImagePreview');
                 const files = Array.from(e.target.files);
-                for (const file of files) {
-                    const processedFile = await processImage(file);
-                    if (processedFile) {
-                        selectedFilesEdit.push(processedFile);
-                    }
-                }
+                selectedFilesEdit = [...selectedFilesEdit, ...files];
                 updateImagePreview(editImagePreview, [...existingImagesEdit, ...selectedFilesEdit], false);
             });
 
@@ -652,7 +644,7 @@
                 formData.set('share', formData.get('share') ? '1' : '');
                 formData.delete('images');
                 for (const file of selectedFilesAdd) {
-                    formData.append('files', file);
+                    formData.append('images', file);
                 }
                 try {
                     const response = await fetch('{{ url_for("add_note") }}', {
@@ -681,9 +673,7 @@
                 document.getElementById('addMemoForm').reset();
                 selectedFilesAdd = [];
                 document.getElementById('imagePreview').innerHTML = '';
-                const nowJST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-                const dateStr = nowJST.toISOString().slice(0, 16);
-                memoDueDateInput.value = dateStr;
+                // ...các xử lý khác...
             });
 
             // Khởi tạo FullCalendar
@@ -852,7 +842,12 @@
 
                         // Hiển thị ảnh hiện có
                         const editImagePreview = document.getElementById('editImagePreview');
-                        existingImagesEdit = note.images ? note.images.map(img => `data:image/${img.filename.split('.').pop().toLowerCase()};base64,${img.data}`) : [];
+                        existingImagesEdit = note.images
+                            ? note.images.map((img, idx) => ({
+                                url: `data:image/${img.filename.split('.').pop().toLowerCase()};base64,${img.data}`,
+                                originalIndex: idx
+                            }))
+                            : [];
                         selectedFilesEdit = [];
                         updateImagePreview(editImagePreview, existingImagesEdit, false);
 
@@ -887,9 +882,9 @@
                 const noteId = formData.get('id');
                 formData.delete('images');
                 for (const file of selectedFilesEdit) {
-                    formData.append('files', file);
+                    formData.append('images', file);
                 }
-                existingImagesEdit.forEach((_, index) => formData.append('keep_images', index));
+                existingImagesEdit.forEach((imgObj, idx) => formData.append('keep_images', imgObj.originalIndex ?? idx));
                 try {
                     const response = await fetch(`/edit_note/${noteId}`, {
                         method: 'POST',
