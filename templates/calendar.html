@@ -702,17 +702,17 @@
                     openViewMemoModal(info.event.id);
                 },
                 dateClick: function(info) {
-                    // Lấy ngày user chọn (UTC)
+                    // Lấy ngày user click (info.date là đối tượng Date, local time)
                     const selectedDate = new Date(info.date);
-                    // Đặt giờ thành 23:00 (vẫn ở UTC)
+                    // Đặt giờ thành 23:00 local
                     selectedDate.setHours(23, 0, 0, 0);
 
-                    // Chuyển sang local time string cho input datetime-local
-                    const local = new Date(selectedDate.getTime() - selectedDate.getTimezoneOffset() * 60000);
-                    const dateStr = local.toISOString().slice(0, 16);
+                    // Format yyyy-MM-ddTHH:mm cho input datetime-local (theo local time)
+                    const pad = n => n.toString().padStart(2, '0');
+                    const dateStr = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}T${pad(selectedDate.getHours())}:${pad(selectedDate.getMinutes())}`;
 
                     document.getElementById('addMemoForm').reset();
-                    memoDueDateInput.value = dateStr;
+                    document.getElementById('memoDueDate').value = dateStr;
                     addMemoModal.show();
                 },
                 eventContent: function(arg) {
