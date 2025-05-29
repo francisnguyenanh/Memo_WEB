@@ -673,13 +673,15 @@
                 document.getElementById('addMemoForm').reset();
                 selectedFilesAdd = [];
                 document.getElementById('imagePreview').innerHTML = '';
-                // Set default due date to today at 23:00 JST
-                const now = new Date();
-                now.setHours(23, 0, 0, 0);
-                // Chuyển sang JST (UTC+9)
-                const jst = new Date(now.getTime() + (9 - now.getTimezoneOffset() / 60) * 60 * 60 * 1000);
-                const dateStr = jst.toISOString().slice(0, 16);
-                document.getElementById('memoDueDate').value = dateStr;
+                // Chỉ set ngày mặc định nếu ô due date đang rỗng
+                const dueDateInput = document.getElementById('memoDueDate');
+                if (!dueDateInput.value) {
+                    const now = new Date();
+                    now.setHours(23, 0, 0, 0);
+                    const pad = n => n.toString().padStart(2, '0');
+                    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                    dueDateInput.value = dateStr;
+                }
             });
 
             // Khởi tạo FullCalendar
