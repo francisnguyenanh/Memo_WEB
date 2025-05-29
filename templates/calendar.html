@@ -668,20 +668,27 @@
                 }
             });
 
+            let openFromCalendar = false;
+
+            const addMemoModalEl = document.getElementById('addMemoModal');
+
             // Xử lý mở addMemoModal
             document.getElementById('addMemoModal').addEventListener('show.bs.modal', function() {
-                document.getElementById('addMemoForm').reset();
-                selectedFilesAdd = [];
-                document.getElementById('imagePreview').innerHTML = '';
-                // Chỉ set ngày mặc định nếu ô due date đang rỗng
-                const dueDateInput = document.getElementById('memoDueDate');
-                if (!dueDateInput.value) {
-                    const now = new Date();
-                    now.setHours(23, 0, 0, 0);
-                    const pad = n => n.toString().padStart(2, '0');
-                    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-                    dueDateInput.value = dateStr;
+                if (!openFromCalendar) {
+                    document.getElementById('addMemoForm').reset();
+                    selectedFilesAdd = [];
+                    document.getElementById('imagePreview').innerHTML = '';
+                    // Chỉ set ngày mặc định nếu ô due date đang rỗng
+                    const dueDateInput = document.getElementById('memoDueDate');
+                    if (!dueDateInput.value) {
+                        const now = new Date();
+                        now.setHours(23, 0, 0, 0);
+                        const pad = n => n.toString().padStart(2, '0');
+                        const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+                        dueDateInput.value = dateStr;
+                    }
                 }
+                openFromCalendar = false; // reset flag
             });
 
             // Khởi tạo FullCalendar
@@ -704,16 +711,14 @@
                     openViewMemoModal(info.event.id);
                 },
                 dateClick: function(info) {
-                    // Lấy ngày user click (info.date là đối tượng Date, local time)
+                    openFromCalendar = true;
+                    document.getElementById('addMemoForm').reset();
+                    selectedFilesAdd = [];
+                    document.getElementById('imagePreview').innerHTML = '';
                     const selectedDate = new Date(info.date);
-                    // Đặt giờ thành 23:00 local
                     selectedDate.setHours(23, 0, 0, 0);
-
-                    // Format yyyy-MM-ddTHH:mm cho input datetime-local (theo local time)
                     const pad = n => n.toString().padStart(2, '0');
                     const dateStr = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}T${pad(selectedDate.getHours())}:${pad(selectedDate.getMinutes())}`;
-
-                    document.getElementById('addMemoForm').reset();
                     document.getElementById('memoDueDate').value = dateStr;
                     addMemoModal.show();
                 },
