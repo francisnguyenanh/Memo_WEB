@@ -394,13 +394,13 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <div class="form-check">
+                            <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="memoShare" name="share">
                                 <label class="form-check-label" for="memoShare">Enable public sharing</label>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <div class="form-check">
+                            <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="memoCompleted" name="is_completed">
                                 <label class="form-check-label" for="memoCompleted">Completed</label>
                             </div>
@@ -495,13 +495,13 @@
                             </select>
                         </div>
                         <div class="mb-3">
-                            <div class="form-check">
+                            <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="editMemoShare" name="share">
                                 <label class="form-check-label" for="editMemoShare">Enable public sharing</label>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <div class="form-check">
+                            <div class="form-check form-switch mb-2">
                                 <input class="form-check-input" type="checkbox" id="editMemoCompleted" name="is_completed">
                                 <label class="form-check-label" for="editMemoCompleted">Completed</label>
                             </div>
@@ -1485,6 +1485,26 @@
             }, 3000);
         });
 
+        function updateAddMemoCategorySelect() {
+            const memoCategory = document.getElementById('memoCategory');
+            if (!memoCategory) return;
+            memoCategory.innerHTML = '';
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                memoCategory.appendChild(option);
+            });
+        }
+
+        if (data.status === 'success') {
+            categories.push(data.category);
+            updateCategoriesDisplay();
+            updateCategorySelect();
+            updateAddMemoCategorySelect(); // <-- Thêm dòng này
+            addCategoryForm.reset();
+            showFlashMessage('success', 'Category added successfully');
+        }
         updateNotesEventListeners();
     </script>
 </body>
