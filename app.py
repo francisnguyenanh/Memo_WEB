@@ -1,6 +1,6 @@
 import base64
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, Response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import bcrypt
@@ -10,16 +10,12 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-import uuid
 import logging
-from datetime import datetime
 from datetime import datetime, timedelta  # Added timedelta
 from uuid import uuid4  # Added uuid4
 from base64 import b64encode
 import json
-from base64 import b64encode
 from wand.image import Image
-import io
 import threading
 import unicodedata
 
