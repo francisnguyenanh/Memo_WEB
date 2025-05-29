@@ -526,11 +526,6 @@
             const memoDueDateInput = document.getElementById('memoDueDate');
             const editMemoForm = document.getElementById('editMemoForm');
 
-            // Biến lưu trữ ảnh
-            let selectedFilesAdd = [];
-            let selectedFilesEdit = [];
-            let existingImagesEdit = [];
-
             // Hàm resize ảnh xuống 30% kích thước
             async function resizeImage(file, scale = 0.3) {
                 return new Promise((resolve) => {
