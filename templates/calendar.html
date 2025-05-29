@@ -578,39 +578,44 @@
                     img.style.objectFit = 'contain';
                     img.classList.add('img-thumbnail');
 
-                    const setImageSource = (src) => {
-                        img.src = src;
-                        container.appendChild(img);
-                        const deleteBtn = document.createElement('button');
-                        deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0';
-                        deleteBtn.innerHTML = '<i class="bi bi-x"></i>';
-                        deleteBtn.onclick = () => {
-                            if (isAddModal) {
-                                selectedFilesAdd.splice(index, 1);
-                                updateImagePreview(previewContainer, selectedFilesAdd, true);
-                            } else {
-                                if (index < existingImagesEdit.length) {
-                                    existingImagesEdit.splice(index, 1);
-                                } else {
-                                    selectedFilesEdit.splice(index - existingImagesEdit.length, 1);
-                                }
-                                updateImagePreview(previewContainer, [...existingImagesEdit, ...selectedFilesEdit], false);
-                            }
-                        };
-                        container.appendChild(deleteBtn);
-                        // Click để xem ảnh lớn
-                        img.onclick = () => {
-                            document.getElementById('enlargedImage').src = src;
-                            imageViewModal.show();
-                        };
-                        previewContainer.appendChild(container);
-                    };
-
-                    if (typeof fileObj === 'string') {
-                        setImageSource(fileObj);
-                    } else {
-                        setImageSource(URL.createObjectURL(fileObj));
+                    let src = '';
+                    if (fileObj && typeof fileObj === 'object' && fileObj.url) {
+                        // Ảnh đã upload (object có url)
+                        src = fileObj.url;
+                    } else if (fileObj instanceof File) {
+                        // File mới upload
+                        src = URL.createObjectURL(fileObj);
+                    } else if (typeof fileObj === 'string') {
+                        // Trường hợp fallback nếu là chuỗi base64
+                        src = fileObj;
                     }
+
+                    img.src = src;
+                    container.appendChild(img);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-danger btn-sm position-absolute top-0 end-0';
+                    deleteBtn.innerHTML = '<i class="bi bi-x"></i>';
+                    deleteBtn.onclick = () => {
+                        if (isAddModal) {
+                            selectedFilesAdd.splice(index, 1);
+                            updateImagePreview(previewContainer, selectedFilesAdd, true);
+                        } else {
+                            if (index < existingImagesEdit.length) {
+                                existingImagesEdit.splice(index, 1);
+                            } else {
+                                selectedFilesEdit.splice(index - existingImagesEdit.length, 1);
+                            }
+                            updateImagePreview(previewContainer, [...existingImagesEdit, ...selectedFilesEdit], false);
+                        }
+                    };
+                    container.appendChild(deleteBtn);
+
+                    img.onclick = () => {
+                        document.getElementById('enlargedImage').src = src;
+                        imageViewModal.show();
+                    };
+                    previewContainer.appendChild(container);
                 });
             }
 
