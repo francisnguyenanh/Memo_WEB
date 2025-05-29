@@ -673,7 +673,13 @@
                 document.getElementById('addMemoForm').reset();
                 selectedFilesAdd = [];
                 document.getElementById('imagePreview').innerHTML = '';
-                // ...các xử lý khác...
+                // Set default due date to today at 23:00 JST
+                const now = new Date();
+                now.setHours(23, 0, 0, 0);
+                // Chuyển sang JST (UTC+9)
+                const jst = new Date(now.getTime() + (9 - now.getTimezoneOffset() / 60) * 60 * 60 * 1000);
+                const dateStr = jst.toISOString().slice(0, 16);
+                document.getElementById('memoDueDate').value = dateStr;
             });
 
             // Khởi tạo FullCalendar
