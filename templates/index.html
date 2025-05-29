@@ -721,7 +721,7 @@
         // Hàm hiển thị preview ảnh với nút xóa
         function updateImagePreview(previewContainer, files, isAddModal) {
             previewContainer.innerHTML = '';
-            files.forEach((file, index) => {
+            files.forEach((fileObj, index) => {
                 const container = document.createElement('div');
                 container.className = 'position-relative';
 
@@ -736,9 +736,10 @@
                 placeholder.style.backgroundColor = '#f8f9fa';
                 placeholder.classList.add('img-thumbnail');
 
-                if (typeof file === 'string') {
+                // Nếu là ảnh đã upload (object có url)
+                if (fileObj && typeof fileObj === 'object' && fileObj.url) {
                     const img = document.createElement('img');
-                    img.src = file;
+                    img.src = fileObj.url;
                     img.style.maxWidth = '100px';
                     img.style.maxHeight = '100px';
                     img.style.objectFit = 'contain';
@@ -749,14 +750,17 @@
                         placeholder.style.textAlign = 'center';
                     };
                     placeholder.appendChild(img);
-                } else if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
+                }
+                // Nếu là file mới upload (File object)
+                else if (fileObj && typeof fileObj === 'object' && (fileObj.type === 'image/heic' || (fileObj.name && fileObj.name.toLowerCase().endsWith('.heic')))) {
                     placeholder.textContent = 'HEIC';
                     placeholder.style.fontSize = '14px';
                     placeholder.style.color = '#666';
                     placeholder.style.textAlign = 'center';
-                } else {
+                }
+                else if (fileObj && typeof fileObj === 'object' && fileObj instanceof File) {
                     const img = document.createElement('img');
-                    img.src = URL.createObjectURL(file);
+                    img.src = URL.createObjectURL(fileObj);
                     img.style.maxWidth = '100px';
                     img.style.maxHeight = '100px';
                     img.style.objectFit = 'contain';
@@ -779,11 +783,7 @@
                         selectedFilesAdd.splice(index, 1);
                         updateImagePreview(previewContainer, selectedFilesAdd, true);
                     } else {
-                        if (index < existingImagesEdit.length) {
-                            existingImagesEdit.splice(index, 1);
-                        } else {
-                            selectedFilesEdit.splice(index - existingImagesEdit.length, 1);
-                        }
+                        existingImagesEdit.splice(index, 1);
                         updateImagePreview(previewContainer, [...existingImagesEdit, ...selectedFilesEdit], false);
                     }
                 };
@@ -1074,8 +1074,6 @@
             document.querySelectorAll('.btn .bi-pencil').forEach(button => {
                 button.parentElement.removeEventListener('click', openEditMemoModal);
             });
-            // Attach edit button listeners
-            attachEditButtonListeners();
             // Add click event to cards for viewing
             document.querySelectorAll('.category-card').forEach(card => {
                 card.addEventListener('click', (e) => {
@@ -1192,7 +1190,12 @@
                     // Hiển thị ảnh hiện có
                     const editImagePreview = document.getElementById('editImagePreview');
                     editImagePreview.innerHTML = '';
-                    existingImagesEdit = note.images ? note.images.map(img => `data:image/${img.filename.split('.').pop()};base64,${img.data}`) : [];
+                    existingImagesEdit = note.images
+                        ? note.images.map((img, idx) => ({
+                            url: `data:image/${img.filename.split('.').pop()};base64,${img.data}`,
+                            originalIndex: idx
+                        }))
+                        : [];
                     selectedFilesEdit = [];
                     updateImagePreview(editImagePreview, existingImagesEdit, false);
 
@@ -1449,7 +1452,7 @@
                     return;
                 }
             }
-            existingImagesEdit.forEach((_, index) => formData.append('keep_images', index));
+            existingImagesEdit.forEach(imgObj => formData.append('keep_images', imgObj.originalIndex));
             try {
                 const response = await fetch(`/edit_note/${noteId}`, {
                     method: 'POST',

@@ -102,7 +102,16 @@
             {% endif %}
             <!-- Hiển thị ảnh -->
             <div class="note-images mt-3 d-flex flex-wrap gap-2" id="noteImages">
-                <!-- Ảnh sẽ được thêm bằng JavaScript -->
+                {% if images %}
+                    {% for image in images %}
+                        <div class="position-relative">
+                            <img src="data:image/{{ image.filename.split('.')[-1]|lower }};base64,{{ image.data }}"
+                                style="max-width:100px;max-height:100px;object-fit:contain;"
+                                class="img-thumbnail"
+                                alt="{{ image.filename }}">
+                        </div>
+                    {% endfor %}
+                {% endif %}
             </div>
         </div>
     </div>
@@ -112,7 +121,7 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="imageViewModalLabel">Image Preview</h5>
+                    <h5 class="modal-title" id="imageViewModalLabel"></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body text-center">
@@ -185,6 +194,16 @@
             displayNoteContent();
             displayNoteImages();
         });
+
+
+        document.querySelectorAll('.note-images img').forEach(img => {
+            img.addEventListener('click', function() {
+                const modal = new bootstrap.Modal(document.getElementById('imageViewModal'));
+                document.getElementById('enlargedImage').src = this.src;
+                modal.show();
+            });
+        });
+
     </script>
 </body>
 </html>

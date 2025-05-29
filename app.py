@@ -1,4 +1,5 @@
 import base64
+import io
 
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -430,6 +431,7 @@ def edit_note(id):
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({
                     'status': 'success',
+                    'message': 'Note updated successfully!',
                     'note': {
                         'id': note.id,
                         'title': note.title,
@@ -543,7 +545,17 @@ def export_pdf(id):
 @app.route('/share/<share_id>')
 def share_note(share_id):
     note = Note.query.filter_by(share_id=share_id).first_or_404()
-    return render_template('share_note.html', note=note)
+    # Đảm bảo images là mảng object
+    images = []
+    if note.images:
+        try:
+            images = json.loads(note.images)
+            # Nếu là mảng chuỗi base64, chuyển thành object
+            if images and isinstance(images[0], str):
+                images = [{'filename': f'image_{i+1}.jpg', 'data': img} for i, img in enumerate(images)]
+        except Exception as e:
+            images = []
+    return render_template('share_note.html', note=note, images=images)
 
 @app.route('/import', methods=['GET', 'POST'])
 @login_required
