@@ -702,8 +702,12 @@
                     openViewMemoModal(info.event.id);
                 },
                 dateClick: function(info) {
-                    const jstDate = new Date(info.date.getTime() + 9 * 60 * 60 * 1000);
-                    const dateStr = jstDate.toISOString().slice(0, 16);
+                    // Lấy ngày user chọn
+                    const selectedDate = new Date(info.date);
+                    // Đặt giờ thành 23:00
+                    selectedDate.setHours(23, 0, 0, 0);
+                    // Định dạng yyyy-MM-ddTHH:mm cho input datetime-local
+                    const dateStr = selectedDate.toISOString().slice(0, 16);
                     memoDueDateInput.value = dateStr;
                     document.getElementById('addMemoForm').reset();
                     memoDueDateInput.value = dateStr;
