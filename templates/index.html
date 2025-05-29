@@ -280,7 +280,10 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
@@ -314,12 +317,13 @@
                 </div>
                 <div class="col-md-2">
                     <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="showReminders" name="show_reminders" value="1" checked>
+                        <input class="form-check-input" type="checkbox" id="showReminders" name="show_reminders" value="1">
                         <label class="form-check-label" for="showReminders"><i class="bi bi-bell"></i> Reminders</label>
                     </div>
                 </div>
             </div>
         </form>
+        
         <div id="reminders" class="mb-3"></div>
         <div class="row" id="notesContainer">
             {% for note in notes %}
@@ -1471,6 +1475,14 @@
                 console.error('Fetch error:', error);
                 showFlashMessage('danger', 'Error updating memo: ' + error.message);
             }
+        });
+
+        // filepath: c:\8. Private\Tool\Memo_WEB\Memo_WEB\templates\index.html
+        document.querySelectorAll('.alert-dismissible').forEach(alert => {
+            setTimeout(() => {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 150);
+            }, 3000);
         });
 
         updateNotesEventListeners();
