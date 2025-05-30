@@ -248,6 +248,22 @@
             margin-bottom: 10px;
         }
         
+        .link-input[readonly] {
+            background-color: #f3f3f3 !important;
+            color: #555;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .link-input:not([readonly]) {
+            background-color: #fffbe6 !important;
+            color: #212529;
+            transition: background 0.2s;
+        }
+        .link-input:focus {
+            background-color: #fffde7 !important;
+            border-color: #ffe066;
+            outline: none;
+        }
     </style>
 </head>
 <body>
@@ -270,7 +286,7 @@
                         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                        <a class="nav-link" href="#" id="showLinksBtn"><i class="bi bi-link-45deg"></i> Links</a>
                     </li>
                 </ul>
             </div>
@@ -354,6 +370,23 @@
                     </div>
                 </div>
             {% endfor %}
+        </div>
+    </div>
+    <!-- filepath: c:\8. Private\Tool\Memo_WEB\Memo_WEB\templates\index.html -->
+    <div class="modal fade" id="linksModal" tabindex="-1" aria-labelledby="linksModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="linksModalLabel">Saved Links</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="linksForm">
+                        <div id="linksInputs"></div>
+                        <button type="submit" class="btn btn-primary mt-2">Update</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
     <!-- Add Memo Modal -->
@@ -1517,6 +1550,120 @@
         }
 
         updateDbSize();
+
+        document.getElementById('showLinksBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            fetch('/links')
+                .then(res => res.json())
+                .then(data => {
+                    const linksInputs = document.getElementById('linksInputs');
+                    linksInputs.innerHTML = '';
+                    let links = data.links || [];
+                    // Luôn thêm 1 dòng trống cuối cùng
+                    links.push('');
+                    links.forEach((link, idx) => {
+                        const div = document.createElement('div');
+                        div.className = 'mb-2 d-flex align-items-center gap-2';
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'form-control link-input';
+                        input.value = link;
+                        input.placeholder = 'Enter link...';
+                        input.style.flex = '1 1 auto';
+
+                        // Nếu là dòng có link (không phải dòng trống)
+                        if (link) {
+                            input.readOnly = true;
+                            input.style.cursor = 'pointer';
+
+                            // Icon chỉnh sửa
+                            const editBtn = document.createElement('button');
+                            editBtn.type = 'button';
+                            editBtn.className = 'btn btn-outline-secondary btn-sm d-flex align-items-center';
+                            editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+                            editBtn.title = 'Edit';
+                            editBtn.onclick = function() {
+                                input.readOnly = false;
+                                input.focus();
+                                input.style.cursor = '';
+                                // Khi blur thì lại readonly
+                                input.addEventListener('blur', function onBlur() {
+                                    input.readOnly = true;
+                                    input.style.cursor = 'pointer';
+                                    input.removeEventListener('blur', onBlur);
+                                });
+                            };
+
+                            // Icon xoá
+                            const deleteBtn = document.createElement('button');
+                            deleteBtn.type = 'button';
+                            deleteBtn.className = 'btn btn-outline-danger btn-sm d-flex align-items-center';
+                            deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+                            deleteBtn.title = 'Delete';
+                            deleteBtn.onclick = function() {
+                                div.remove();
+                            };
+
+                            // Click vào input sẽ mở link ở tab mới (nếu readonly)
+                            input.addEventListener('click', function(e) {
+                                if (input.readOnly && input.value.trim()) {
+                                    window.open(input.value.startsWith('http') ? input.value : 'http://' + input.value, '_blank');
+                                }
+                            });
+
+                            div.appendChild(input);
+                            div.appendChild(editBtn);
+                            div.appendChild(deleteBtn);
+                        } else {
+                            // Dòng trống cho phép nhập, tự động thêm dòng mới khi nhập
+                            input.addEventListener('input', function() {
+                                const allInputs = document.querySelectorAll('.link-input');
+                                if (idx === allInputs.length - 1 && input.value.trim() !== '') {
+                                    const newDiv = document.createElement('div');
+                                    newDiv.className = 'mb-2 d-flex align-items-center gap-2';
+                                    const newInput = document.createElement('input');
+                                    newInput.type = 'text';
+                                    newInput.className = 'form-control link-input';
+                                    newInput.placeholder = 'Enter link...';
+                                    newInput.style.flex = '1 1 auto';
+                                    newDiv.appendChild(newInput);
+                                    linksInputs.appendChild(newDiv);
+                                    newInput.addEventListener('input', arguments.callee);
+                                }
+                            });
+                            div.appendChild(input);
+                        }
+                        linksInputs.appendChild(div);
+                    });
+                    const modal = new bootstrap.Modal(document.getElementById('linksModal'));
+                    modal.show();
+                });
+        });
+
+        document.getElementById('linksForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const inputs = document.querySelectorAll('.link-input');
+            const links = [];
+            inputs.forEach(input => {
+                const val = input.value.trim();
+                if (val) links.push(val);
+            });
+            fetch('/links', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                body: JSON.stringify({links: links})
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Đóng modal hoặc thông báo thành công
+                    showFlashMessage && showFlashMessage('success', 'Links updated!');
+                    bootstrap.Modal.getInstance(document.getElementById('linksModal')).hide();
+                } else {
+                    alert('Failed to update links');
+                }
+            });
+        });
 
         updateNotesEventListeners();
     </script>
