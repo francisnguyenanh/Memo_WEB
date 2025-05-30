@@ -108,18 +108,7 @@
             position: relative;
             z-index: 1;
         }
-        .category-card::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            right: 0;
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(45deg, transparent 50%, rgba(0, 0, 0, 0.3) 50%);
-            border-bottom-right-radius: 10px;
-            transform: rotate(-5deg);
-            z-index: 2;
-        }
+
         .category-card:hover {
             transform: translateY(-8px) scale(1.02) rotate(0deg);
             box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
@@ -898,18 +887,14 @@
                     const textColor = luminance > 0.5 ? '#000000' : '#ffffff';
                     card.style.color = textColor;
                     card.querySelectorAll('.card-title, .card-text, .text-muted, .text-muted a, .card-body a').forEach(el => {
-                        el.style.color = textColor;
+                        el.style.setProperty('color', textColor, 'important');
                     });
                     // Apply random rotation
                     const randomAngle = (Math.random() - 0.5) * 6;
                     card.style.setProperty('--random-rotation', `${randomAngle}deg`);
                     card.style.transform = `rotate(${randomAngle}deg)`;
                     // Randomly assign pushpin or tape
-                    if (Math.random() > 0.5) {
-                        card.classList.add('pushpin');
-                    } else {
-                        card.classList.remove('pushpin');
-                    }
+
                     // Subtle color variation
                     const variation = Math.random() * 0.1 + 0.95;
                     const rgbValues = rgb.map(v => Math.min(255, Math.max(0, Math.round(v * variation))));

@@ -1,7 +1,6 @@
 import base64
-import io
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import bcrypt
@@ -11,12 +10,16 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+import uuid
 import logging
+from datetime import datetime
 from datetime import datetime, timedelta  # Added timedelta
 from uuid import uuid4  # Added uuid4
 from base64 import b64encode
 import json
+from base64 import b64encode
 from wand.image import Image
+import io
 import threading
 import unicodedata
 
@@ -219,52 +222,39 @@ def add_note():
             )
             db.session.add(note)
             db.session.commit()
-            
-            # Lấy danh sách file và xử lý bất đồng bộ
-            files = request.files.getlist('images')
-            file_datas = []
-            for file in files:
-                if file and file.filename:
-                    file_data = file.read()
-                    file.seek(0)  # Đặt lại con trỏ nếu cần dùng lại ở chỗ khác
-                    file_datas.append({
-                        'filename': file.filename,
-                        'content_type': file.content_type,
-                        'data': file_data
-                    })
-            
 
             # Hàm xử lý ảnh bất đồng bộ
-            def process_images(note_id, file_datas):
+            def process_images(note_id, files):
                 with app.app_context():
-                    app.logger.debug(f"Processing images for note_id {note_id}, files: {[f['filename'] for f in file_datas]}")
+                    app.logger.debug(f"Processing images for note_id {note_id}, files: {[f.filename for f in files]}")
                     images = []
-                    for file_info in file_datas:
-                        allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
-                        normalized_filename = normalize_filename(file_info['filename'])
-                        ext = os.path.splitext(normalized_filename.lower())[1]
-                        if ext in allowed_extensions:
-                            try:
-                                if ext == '.heic':
-                                    with Image(blob=file_info['data']) as img:
-                                        img.format = 'jpeg'
-                                        img.compression_quality = 20
-                                        output = io.BytesIO()
-                                        img.save(file=output)
-                                        image_data = output.getvalue()
-                                    filename = normalized_filename.replace('.heic', '.jpg')
-                                else:
-                                    image_data = file_info['data']
-                                    filename = normalized_filename
-                                image_base64 = b64encode(image_data).decode('utf-8')
-                                images.append({
-                                    'filename': filename,
-                                    'data': image_base64
-                                })
-                            except Exception as e:
-                                app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
-                        else:
-                            app.logger.warning(f"Invalid file type: {normalized_filename}")
+                    for file in files:
+                        if file and file.filename:
+                            allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                            normalized_filename = normalize_filename(file.filename)
+                            ext = os.path.splitext(normalized_filename.lower())[1]
+                            if ext in allowed_extensions:
+                                try:
+                                    if ext == '.heic':
+                                        with Image(file=file) as img:
+                                            img.format = 'jpeg'
+                                            img.compression_quality = 20
+                                            output = io.BytesIO()
+                                            img.save(file=output)
+                                            image_data = output.getvalue()
+                                        filename = normalized_filename.replace('.heic', '.jpg')
+                                    else:
+                                        image_data = file.read()
+                                        filename = normalized_filename
+                                    image_base64 = b64encode(image_data).decode('utf-8')
+                                    images.append({
+                                        'filename': filename,
+                                        'data': image_base64
+                                    })
+                                except Exception as e:
+                                    app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
+                            else:
+                                app.logger.warning(f"Invalid file type: {normalized_filename}")
                     if images:
                         try:
                             note = Note.query.get(note_id)
@@ -274,10 +264,11 @@ def add_note():
                         except Exception as e:
                             app.logger.error(f"Error saving images to DB for note_id {note_id}: {str(e)}")
 
-            
+            # Lấy danh sách file và xử lý bất đồng bộ
+            files = request.files.getlist('images')
             app.logger.debug(f"Received files: {[f.filename for f in files if f.filename]}")
-            if file_datas:
-                threading.Thread(target=process_images, args=(note.id, file_datas)).start()
+            if files and any(file.filename for file in files):
+                threading.Thread(target=process_images, args=(note.id, files)).start()
             else:
                 app.logger.debug("No valid image files received")
 
@@ -390,50 +381,38 @@ def edit_note(id):
             note.images = json.dumps(images) if images else None
             db.session.commit()
 
-            # Lấy danh sách file mới và xử lý bất đồng bộ
-            files = request.files.getlist('images')
-            file_datas = []
-            for file in files:
-                if file and file.filename:
-                    file_data = file.read()
-                    file.seek(0)
-                    file_datas.append({
-                        'filename': file.filename,
-                        'content_type': file.content_type,
-                        'data': file_data
-                    })
-
-            # Sửa hàm process_new_images để nhận file_datas thay vì files
-            def process_new_images(note_id, file_datas, existing_images):
+            # Hàm xử lý ảnh mới bất đồng bộ
+            def process_new_images(note_id, files, existing_images):
                 with app.app_context():
-                    app.logger.debug(f"Processing new images for note_id {note_id}, files: {[f['filename'] for f in file_datas]}")
+                    app.logger.debug(f"Processing new images for note_id {note_id}, files: {[f.filename for f in files]}")
                     new_images = existing_images[:] if existing_images else []
-                    for file_info in file_datas:
-                        allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
-                        normalized_filename = normalize_filename(file_info['filename'])
-                        ext = os.path.splitext(normalized_filename.lower())[1]
-                        if ext in allowed_extensions:
-                            try:
-                                if ext == '.heic':
-                                    with Image(blob=file_info['data']) as img:
-                                        img.format = 'jpeg'
-                                        img.compression_quality = 20
-                                        output = io.BytesIO()
-                                        img.save(file=output)
-                                        image_data = output.getvalue()
-                                    filename = normalized_filename.replace('.heic', '.jpg')
-                                else:
-                                    image_data = file_info['data']
-                                    filename = normalized_filename
-                                image_base64 = b64encode(image_data).decode('utf-8')
-                                new_images.append({
-                                    'filename': filename,
-                                    'data': image_base64
-                                })
-                            except Exception as e:
-                                app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
-                        else:
-                            app.logger.warning(f"Invalid file type: {normalized_filename}")
+                    for file in files:
+                        if file and file.filename:
+                            allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.heic'}
+                            normalized_filename = normalize_filename(file.filename)
+                            ext = os.path.splitext(normalized_filename.lower())[1]
+                            if ext in allowed_extensions:
+                                try:
+                                    if ext == '.heic':
+                                        with Image(file=file) as img:
+                                            img.format = 'jpeg'
+                                            img.compression_quality = 20
+                                            output = io.BytesIO()
+                                            img.save(file=output)
+                                            image_data = output.getvalue()
+                                        filename = normalized_filename.replace('.heic', '.jpg')
+                                    else:
+                                        image_data = file.read()
+                                        filename = normalized_filename
+                                    image_base64 = b64encode(image_data).decode('utf-8')
+                                    new_images.append({
+                                        'filename': filename,
+                                        'data': image_base64
+                                    })
+                                except Exception as e:
+                                    app.logger.error(f"Error processing image {normalized_filename}: {str(e)}")
+                            else:
+                                app.logger.warning(f"Invalid file type: {normalized_filename}")
                     try:
                         note = Note.query.get(note_id)
                         note.images = json.dumps(new_images) if new_images else None
@@ -442,9 +421,11 @@ def edit_note(id):
                     except Exception as e:
                         app.logger.error(f"Error saving images to DB for note_id {note_id}: {str(e)}")
 
+            # Lấy danh sách file mới và xử lý bất đồng bộ
+            files = request.files.getlist('images')
             app.logger.debug(f"Received files for edit: {[f.filename for f in files if f.filename]}")
-            if file_datas:
-                threading.Thread(target=process_new_images, args=(note.id, file_datas, images)).start()
+            if files and any(file.filename for file in files):
+                threading.Thread(target=process_new_images, args=(note.id, files, images)).start()
             else:
                 app.logger.debug("No valid new image files received")
 
@@ -453,7 +434,6 @@ def edit_note(id):
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({
                     'status': 'success',
-                    'message': 'Note updated successfully!',
                     'note': {
                         'id': note.id,
                         'title': note.title,
@@ -559,6 +539,32 @@ def export_pdf(id):
         p.drawString(100, y, line)
         y -= 20
     p.drawString(100, y, f"Category: {note.category.name if note.category else 'None'}")
+    y -= 30
+
+    # Thêm ảnh vào PDF
+    images = json.loads(note.images) if note.images else []
+    for img in images:
+        try:
+            img_data = base64.b64decode(img['data'])
+            img_buffer = BytesIO(img_data)
+            # Chèn ảnh, resize cho phù hợp trang
+            from reportlab.lib.utils import ImageReader
+            image = ImageReader(img_buffer)
+            iw, ih = image.getSize()
+            max_width = 400
+            max_height = 300
+            scale = min(max_width / iw, max_height / ih, 1)
+            draw_width = iw * scale
+            draw_height = ih * scale
+            if y - draw_height < 50:
+                p.showPage()
+                y = 750
+            p.drawImage(image, 100, y - draw_height, width=draw_width, height=draw_height)
+            y -= draw_height + 20
+        except Exception as e:
+            # Nếu lỗi ảnh, bỏ qua ảnh đó
+            continue
+
     p.showPage()
     p.save()
     buffer.seek(0)
@@ -567,17 +573,7 @@ def export_pdf(id):
 @app.route('/share/<share_id>')
 def share_note(share_id):
     note = Note.query.filter_by(share_id=share_id).first_or_404()
-    # Đảm bảo images là mảng object
-    images = []
-    if note.images:
-        try:
-            images = json.loads(note.images)
-            # Nếu là mảng chuỗi base64, chuyển thành object
-            if images and isinstance(images[0], str):
-                images = [{'filename': f'image_{i+1}.jpg', 'data': img} for i, img in enumerate(images)]
-        except Exception as e:
-            images = []
-    return render_template('share_note.html', note=note, images=images)
+    return render_template('share_note.html', note=note)
 
 @app.route('/import', methods=['GET', 'POST'])
 @login_required
@@ -805,65 +801,6 @@ def sync_notes():
     except Exception as e:
         app.logger.error(f"Sync error: {str(e)}")
         return {'error': str(e)}, 500
-
-@app.route('/db_size')
-@login_required
-def db_size():
-    import os
-    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-    if db_uri.startswith('sqlite:///'):
-        db_path = db_uri.replace('sqlite:///', '')
-        # Nếu là đường dẫn tương đối, Flask sẽ tìm trong instance_path
-        if not os.path.isabs(db_path):
-            db_path = os.path.join(app.instance_path, db_path)
-        try:
-            size_bytes = os.path.getsize(db_path)
-            size_mb = round(size_bytes / (1024 * 1024), 2)
-            size_kb = round(size_bytes / 1024, 1)
-            db_filename = os.path.basename(db_path)
-            return jsonify({'size_mb': size_mb, 'size_kb': size_kb, 'db_file': db_filename, 'db_path': db_path})
-        except Exception as e:
-            return jsonify({'size_mb': 0, 'size_kb': 0, 'db_file': db_path, 'error': str(e)})
-    return jsonify({'size_mb': 0, 'size_kb': 0, 'error': 'Not a sqlite DB'})
-
-@app.route('/links')
-@login_required
-def get_links():
-    links = []
-    try:
-        with open('link.txt', 'r', encoding='utf-8') as f:
-            for line in f:
-                url = line.strip()
-                if url:
-                    links.append(url)
-    except Exception as e:
-        app.logger.error(f"Error reading link.txt: {e}")
-    return jsonify({'links': links})
-
-@app.route('/links', methods=['GET', 'POST'])
-@login_required
-def links():
-    if request.method == 'POST':
-        data = request.get_json()
-        links = data.get('links', [])
-        try:
-            with open('link.txt', 'w', encoding='utf-8') as f:
-                for link in links:
-                    f.write(link.strip() + '\n')
-            return jsonify({'status': 'success'})
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)})
-    # GET như cũ
-    links = []
-    try:
-        with open('link.txt', 'r', encoding='utf-8') as f:
-            for line in f:
-                url = line.strip()
-                if url:
-                    links.append(url)
-    except Exception as e:
-        app.logger.error(f"Error reading link.txt: {e}")
-    return jsonify({'links': links})
 
 if __name__ == '__main__':
     app.run(debug=True)
