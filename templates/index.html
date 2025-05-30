@@ -1559,20 +1559,18 @@
                     const linksInputs = document.getElementById('linksInputs');
                     linksInputs.innerHTML = '';
                     let links = data.links || [];
-                    // Luôn thêm 1 dòng trống cuối cùng
-                    links.push('');
-                    links.forEach((link, idx) => {
+
+                    function createLinkInput(linkValue = '') {
                         const div = document.createElement('div');
                         div.className = 'mb-2 d-flex align-items-center gap-2';
                         const input = document.createElement('input');
                         input.type = 'text';
                         input.className = 'form-control link-input';
-                        input.value = link;
+                        input.value = linkValue;
                         input.placeholder = 'Enter link...';
                         input.style.flex = '1 1 auto';
 
-                        // Nếu là dòng có link (không phải dòng trống)
-                        if (link) {
+                        if (linkValue) {
                             input.readOnly = true;
                             input.style.cursor = 'pointer';
 
@@ -1586,7 +1584,6 @@
                                 input.readOnly = false;
                                 input.focus();
                                 input.style.cursor = '';
-                                // Khi blur thì lại readonly
                                 input.addEventListener('blur', function onBlur() {
                                     input.readOnly = true;
                                     input.style.cursor = 'pointer';
@@ -1604,7 +1601,6 @@
                                 div.remove();
                             };
 
-                            // Click vào input sẽ mở link ở tab mới (nếu readonly)
                             input.addEventListener('click', function(e) {
                                 if (input.readOnly && input.value.trim()) {
                                     window.open(input.value.startsWith('http') ? input.value : 'http://' + input.value, '_blank');
@@ -1616,25 +1612,21 @@
                             div.appendChild(deleteBtn);
                         } else {
                             // Dòng trống cho phép nhập, tự động thêm dòng mới khi nhập
-                            input.addEventListener('input', function() {
-                                const allInputs = document.querySelectorAll('.link-input');
-                                if (idx === allInputs.length - 1 && input.value.trim() !== '') {
-                                    const newDiv = document.createElement('div');
-                                    newDiv.className = 'mb-2 d-flex align-items-center gap-2';
-                                    const newInput = document.createElement('input');
-                                    newInput.type = 'text';
-                                    newInput.className = 'form-control link-input';
-                                    newInput.placeholder = 'Enter link...';
-                                    newInput.style.flex = '1 1 auto';
-                                    newDiv.appendChild(newInput);
-                                    linksInputs.appendChild(newDiv);
-                                    newInput.addEventListener('input', arguments.callee);
+                            input.addEventListener('input', function handler() {
+                                if (input.value.trim() !== '' && !div.nextElementSibling) {
+                                    createLinkInput();
                                 }
                             });
                             div.appendChild(input);
                         }
                         linksInputs.appendChild(div);
-                    });
+                    }
+
+                    // Tạo input cho các link đã có
+                    links.forEach(link => createLinkInput(link));
+                    // Luôn có 1 dòng trống cuối cùng
+                    createLinkInput();
+
                     const modal = new bootstrap.Modal(document.getElementById('linksModal'));
                     modal.show();
                 });
