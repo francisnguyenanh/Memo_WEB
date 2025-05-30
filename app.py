@@ -802,5 +802,19 @@ def sync_notes():
         app.logger.error(f"Sync error: {str(e)}")
         return {'error': str(e)}, 500
 
+import os
+
+@app.route('/db_size')
+@login_required
+def db_size():
+    db_path = os.path.join(app.instance_path, 'memo.db')  # Sửa lại đường dẫn này
+    try:
+        size_bytes = os.path.getsize(db_path)
+        size_kb = round(size_bytes / 1024, 2)
+        size_mb = round(size_kb / 1024, 2)
+        return jsonify({'size_bytes': size_bytes, 'size_kb': size_kb, 'size_mb': size_mb})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 if __name__ == '__main__':
     app.run(debug=True)
