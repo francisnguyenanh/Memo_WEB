@@ -87,9 +87,80 @@
                 margin-bottom: 8px;
             }
         }
+        :root {
+            --bg-color: #f8f9fa;
+            --text-color: #000;
+            --card-bg: #fff;
+        }
+        [data-theme="dark"] {
+            --bg-color: #343a40;
+            --text-color: #ffffff;
+            --card-bg: #495057;
+            --primary-color: #6c757d;
+        }
+        [data-theme="blue"] {
+            --bg-color: #e6f0fa;
+            --text-color: #003087;
+            --card-bg: #d6e4f0;
+            --primary-color: #004aad;
+        }
+        [data-theme="green"] {
+            --bg-color: #e6f4ea;
+            --text-color: #004d00;
+            --card-bg: #d4edda;
+            --primary-color: #006400;
+        }
+        [data-theme="purple"] {
+            --bg-color: #f3e5f5;
+            --text-color: #4a0072;
+            --card-bg: #e1bee7;
+            --primary-color: #6a1b9a;
+        }
+        [data-theme="red"] {
+            --bg-color: #ffe6e6;
+            --text-color: #721c24;
+            --card-bg: #f5c6cb;
+            --primary-color: #dc3545;
+        }
+        [data-theme="orange"] {
+            --bg-color: #fff3e0;
+            --text-color: #8a3e00;
+            --card-bg: #ffe5b4;
+            --primary-color: #fd7e14;
+        }
+        [data-theme="yellow"] {
+            --bg-color: #fffde7;
+            --text-color: #856404;
+            --card-bg: #fff3cd;
+            --primary-color: #ffc107;
+        }
+        [data-theme="pink"] {
+            --bg-color: #fce4ec;
+            --text-color: #771653;
+            --card-bg: #f8c1d0;
+            --primary-color: #e83e8c;
+        }
+        [data-theme="cyan"] {
+            --bg-color: #e0f7fa;
+            --text-color: #005257;
+            --card-bg: #b2ebf2;
+            --primary-color: #00acc1;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+        .note-content {
+            background-color: var(--card-bg);
+        }
     </style>
 </head>
 <body>
+    <script>
+        // Set theme from localStorage nếu có
+        const theme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', theme);
+    </script>
     <div class="container mt-4">
         <div class="note-content">
             <h2 class="note-title">{{ note.title }}</h2>
@@ -132,6 +203,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         // Hàm chuyển đổi URL thành liên kết có thể nhấp
         function linkify(text) {
@@ -203,7 +275,6 @@
                 modal.show();
             });
         });
-
     </script>
 </body>
 </html>

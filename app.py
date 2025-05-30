@@ -806,5 +806,26 @@ def sync_notes():
         app.logger.error(f"Sync error: {str(e)}")
         return {'error': str(e)}, 500
 
+@app.route('/db_size')
+@login_required
+def db_size():
+    import os
+    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    if db_uri.startswith('sqlite:///'):
+        db_path = db_uri.replace('sqlite:///', '')
+        # Nếu là đường dẫn tương đối, Flask sẽ tìm trong instance_path
+        if not os.path.isabs(db_path):
+            db_path = os.path.join(app.instance_path, db_path)
+        try:
+            size_bytes = os.path.getsize(db_path)
+            size_mb = round(size_bytes / (1024 * 1024), 2)
+            size_kb = round(size_bytes / 1024, 1)
+            db_filename = os.path.basename(db_path)
+            return jsonify({'size_mb': size_mb, 'size_kb': size_kb, 'db_file': db_filename, 'db_path': db_path})
+        except Exception as e:
+            return jsonify({'size_mb': 0, 'size_kb': 0, 'db_file': db_path, 'error': str(e)})
+    return jsonify({'size_mb': 0, 'size_kb': 0, 'error': 'Not a sqlite DB'})
+
+
 if __name__ == '__main__':
     app.run(debug=True)
