@@ -815,6 +815,45 @@ def db_size():
         return jsonify({'size_bytes': size_bytes, 'size_kb': size_kb, 'size_mb': size_mb})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
+
+@app.route('/links')
+@login_required
+def get_links():
+    links = []
+    try:
+        with open('link.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                url = line.strip()
+                if url:
+                    links.append(url)
+    except Exception as e:
+        app.logger.error(f"Error reading link.txt: {e}")
+    return jsonify({'links': links})
+
+@app.route('/links', methods=['GET', 'POST'])
+@login_required
+def links():
+    if request.method == 'POST':
+        data = request.get_json()
+        links = data.get('links', [])
+        try:
+            with open('link.txt', 'w', encoding='utf-8') as f:
+                for link in links:
+                    f.write(link.strip() + '\n')
+            return jsonify({'status': 'success'})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)})
+    # GET như cũ
+    links = []
+    try:
+        with open('link.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                url = line.strip()
+                if url:
+                    links.append(url)
+    except Exception as e:
+        app.logger.error(f"Error reading link.txt: {e}")
+    return jsonify({'links': links})
+
 if __name__ == '__main__':
     app.run(debug=True)
