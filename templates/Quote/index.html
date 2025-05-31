@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+    <!-- Hiển thị thông báo -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <h2 class="mb-3">Tạo Trích Dẫn</h2>
+    <form method="POST" class="mb-4">
+        <div class="mb-3">
+            <textarea name="content" class="form-control" placeholder="Nhập trích dẫn" rows="5" required></textarea>
+        </div>
+        <div class="mb-3">
+            <input type="text" name="category" class="form-control" placeholder="Nhập nguồn"
+                   list="categoryList" required>
+        </div>
+        {% if require_password %}
+        <div class="mb-3">
+            <input type="password" name="password" class="form-control" placeholder="Nhập mật khẩu" required>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-primary w-100 w-md-auto">Thêm Trích Dẫn</button>
+    </form>
+
+    <h3 class="mb-3">Tất Cả Trích Dẫn</h3>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Trích Dẫn</th>
+                    <th>Nguồn</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for quote in quotes %}
+                <tr>
+                    <td>{{ quote[1] | nl2br | safe }}</td>
+                    <td>{{ quote[2] }}</td>
+                    <td>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-primary btn-sm w-100 w-md-auto edit-btn"
+                                    data-id="{{ quote[0] }}"
+                                    data-content="{{ quote[1] | e }}"
+                                    data-category="{{ quote[2] | e }}"
+                                    style="max-width: 80px;">
+                                Sửa
+                            </button>
+                            <button type="button" class="btn btn-danger btn-sm w-100 w-md-auto"
+                                    onclick="promptDelete({{ quote[0] }})"
+                                    style="max-width: 80px;">
+                                Xóa
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Modal chỉnh sửa chung -->
+    <div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content" style="background-color: #5A6A5A; color: #F0F5F0;">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editModalLabel">Sửa Trích Dẫn</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form method="POST" id="editForm">
+                    <div class="modal-body">
+                        <input type="hidden" name="id" id="editId">
+                        <div class="mb-3">
+                            <textarea name="content" id="editContent" class="form-control" rows="5" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <input type="text" name="category" id="editCategory" class="form-control"
+                                   list="categoryList" required>
+                        </div>
+                        {% if require_password %}
+                        <div class="mb-3">
+                            <input type="password" name="password" id="editPassword" class="form-control"
+                                   placeholder="Nhập mật khẩu" required>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        <button type="submit" class="btn btn-primary">Lưu Thay Đổi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phần quản lý nguồn -->
+    <h3 class="mb-3 mt-4">Quản Lý Nguồn</h3>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Nguồn</th>
+                    <th>Số Trích Dẫn</th>
+                    <th>Hành Động</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category, count in category_counts %}
+                <tr>
+                    <td>{{ category }}</td>
+                    <td>{{ count }}</td>
+                    <td>
+                        <button type="button" class="btn btn-danger btn-sm w-100 w-md-auto"
+                                onclick="promptDeleteCategory('{{ category }}')"
+                                style="max-width: 80px;">
+                            Xóa
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Datalist chung cho cả trang -->
+    <datalist id="categoryList">
+        {% for category in categories %}
+        <option value="{{ category }}">
+        {% endfor %}
+    </datalist>
+
+    <!-- Script để xử lý prompt và modal -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Xử lý nút Sửa
+            const editButtons = document.querySelectorAll('.edit-btn');
+            const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+            const editForm = document.getElementById('editForm');
+
+            editButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const content = this.getAttribute('data-content');
+                    const category = this.getAttribute('data-category');
+
+                    // Điền dữ liệu vào form
+                    document.getElementById('editId').value = id;
+                    document.getElementById('editContent').value = content;
+                    document.getElementById('editCategory').value = category;
+                    {% if require_password %}
+                    document.getElementById('editPassword').value = '';
+                    {% endif %}
+
+                    // Cập nhật action của form
+                    editForm.action = `/edit/${id}`;
+
+                    // Mở modal
+                    editModal.show();
+                });
+            });
+
+            // Xử lý xóa trích dẫn
+            function promptDelete(quoteId) {
+                {% if require_password %}
+                let password = prompt("Nhập mật khẩu để xóa trích dẫn:");
+                if (password) {
+                    if (confirm("Bạn có chắc chắn muốn xóa?")) {
+                        window.location.href = "/delete/" + quoteId + "?password=" + encodeURIComponent(password);
+                    }
+                }
+                {% else %}
+                if (confirm("Bạn có chắc chắn muốn xóa?")) {
+                    window.location.href = "/delete/" + quoteId;
+                }
+                {% endif %}
+            }
+
+            // Xử lý xóa nguồn
+            function promptDeleteCategory(category) {
+                {% if require_password %}
+                let password = prompt("Nhập mật khẩu để xóa nguồn:");
+                if (password) {
+                    if (confirm("Bạn có chắc chắn muốn xóa nguồn này?")) {
+                        window.location.href = "/delete_category/" + encodeURIComponent(category) + "?password=" + encodeURIComponent(password);
+                    }
+                }
+                {% else %}
+                if (confirm("Bạn có chắc chắn muốn xóa nguồn này?")) {
+                    window.location.href = "/delete_category/" + encodeURIComponent(category);
+                }
+                {% endif %}
+            }
+
+            window.promptDelete = promptDelete;
+            window.promptDeleteCategory = promptDeleteCategory;
+        });
+    </script>
+{% endblock %}

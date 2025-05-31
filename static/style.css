@@ -1,0 +1,196 @@
+/* Sử dụng font Roboto từ Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+
+body {
+    min-height: 100vh;
+    color: #F0F5F0;
+    font-family: 'Times New Roman', serif;
+}
+
+.navbar {
+    background-color: #4A5A4A;
+}
+
+.navbar-brand, .nav-link {
+    color: #F0F5F0 !important;
+}
+
+.navbar-brand:hover, .nav-link:hover {
+    color: #C8D8C8 !important;
+}
+
+.card {
+    background-color: #5A6A5A;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    position: relative; /* Đảm bảo card không bị trôi */
+}
+
+blockquote {
+    font-size: 1.1em;
+    color: #F0F5F0;
+}
+
+.blockquote-footer {
+    color: #B8D0B8;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Đảm bảo nút Chuông Chánh Niệm không bị đè */
+#bellButton {
+    position: relative;
+    z-index: 1; /* Đưa nút lên trên nếu có chồng lấn */
+}
+
+.btn-primary {
+    background-color: #6A806A;
+    border-color: #6A806A;
+    color: #F0F5F0;
+}
+
+.btn-primary:hover {
+    background-color: #5A705A;
+    border-color: #5A705A;
+}
+
+.btn-success {
+    background-color: #869686;
+    border-color: #869686;
+    color: #F0F5F0;
+}
+
+.btn-success:hover {
+    background-color: #6A806A;
+    border-color: #6A806A;
+}
+
+.btn-secondary {
+    background-color: #5A6A5A;
+    border-color: #5A6A5A;
+    color: #F0F5F0;
+}
+
+.btn-secondary:hover {
+    background-color: #4A5A4A;
+    border-color: #4A5A4A;
+}
+
+.alert-info {
+    background-color: #6A806A;
+    border-color: #5A705A;
+    color: #F0F5F0;
+}
+
+/* Tùy chỉnh modal */
+.modal-content {
+    background-color: #5A6A5A;
+    color: #F0F5F0;
+    border-radius: 0.5rem;
+    font-family: 'Times New Roman', serif;
+}
+
+.modal-header {
+    border-bottom: 1px solid #6A806A;
+}
+
+.modal-footer {
+    border-top: 1px solid #6A806A;
+}
+
+.btn-close-white {
+    filter: invert(1); /* Đảm bảo nút đóng hiển thị trắng trên nền tối */
+    opacity: 0.8;
+}
+
+.btn-close-white:hover {
+    opacity: 1;
+}
+
+/* Tùy chỉnh input và textarea trong modal */
+.modal-body .form-control {
+    background-color: #4A5A4A;
+    border-color: #6A806A;
+    color: #F0F5F0;
+    font-family: 'Times New Roman', serif;
+}
+
+.modal-body .form-control::placeholder {
+    color: #B8D0B8;
+}
+
+.modal-body .form-control:focus {
+    background-color: #4A5A4A;
+    border-color: #869686;
+    box-shadow: 0 0 0 0.2rem rgba(134, 150, 134, 0.25);
+}
+
+/* Tùy chỉnh bảng */
+.table {
+    color: #F0F5F0;
+    background-color: #5A6A5A;
+}
+
+.table th, .table td {
+    vertical-align: middle;
+    border-color: #6A806A;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: #4A5A4A;
+}
+
+/* Tùy chỉnh nút trong bảng */
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.d-flex.gap-2 {
+    gap: 0.5rem !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .blockquote {
+        font-size: 1em;
+    }
+
+    .btn {
+        padding: 0.375rem 0.75rem;
+    }
+
+    .d-flex.gap-2 {
+        flex-direction: column;
+        gap: 0.5rem !important;
+    }
+
+    .btn-sm.w-100 {
+        max-width: none;
+    }
+
+    .modal-dialog {
+        margin: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+
+    .modal-content {
+        font-size: 0.875rem;
+    }
+}
+
+/* Tùy chỉnh textarea */
+textarea.form-control {
+    resize: vertical;
+}
+
+/* Tùy chỉnh datalist */
+input[list="categoryList"] {
+    background-color: #4A5A4A;
+    color: #F0F5F0;
+}
