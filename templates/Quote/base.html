@@ -1,298 +1,163 @@
+<!-- filepath: /Users/eikitomobe/Documents/3. Học tập/Lập trình/VS code/Memo_WEB/templates/Quote/base.html -->
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en" data-theme="{{ theme|default('light') }}">
 <head>
-    <title>Tomo Quotes</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Tomo Quotes - Quản lý và xem các trích dẫn ý nghĩa">
-    <meta name="keywords" content="quotes, trích dẫn, Tomo Quotes">
-    <meta name="author" content="Tomo Quotes Team">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Quotes{% endblock %}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        /* Existing styles */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f8f9fa;
+            --primary-color: #0d6efd;
+        }
+        [data-theme="dark"] {
+            --bg-color: #343a40;
+            --text-color: #ffffff;
+            --card-bg: #495057;
+            --primary-color: #6c757d;
+        }
+        [data-theme="blue"] {
+            --bg-color: #e6f0fa;
+            --text-color: #003087;
+            --card-bg: #d6e4f0;
+            --primary-color: #004aad;
+        }
+        [data-theme="green"] {
+            --bg-color: #e6f4ea;
+            --text-color: #004d00;
+            --card-bg: #d4edda;
+            --primary-color: #006400;
+        }
+        [data-theme="purple"] {
+            --bg-color: #f3e5f5;
+            --text-color: #4a0072;
+            --card-bg: #e1bee7;
+            --primary-color: #6a1b9a;
+        }
+        [data-theme="red"] {
+            --bg-color: #ffe6e6;
+            --text-color: #721c24;
+            --card-bg: #f5c6cb;
+            --primary-color: #dc3545;
+        }
+        [data-theme="orange"] {
+            --bg-color: #fff3e0;
+            --text-color: #8a3e00;
+            --card-bg: #ffe5b4;
+            --primary-color: #fd7e14;
+        }
+        [data-theme="yellow"] {
+            --bg-color: #fffde7;
+            --text-color: #856404;
+            --card-bg: #fff3cd;
+            --primary-color: #ffc107;
+        }
+        [data-theme="pink"] {
+            --bg-color: #fce4ec;
+            --text-color: #771653;
+            --card-bg: #f8c1d0;
+            --primary-color: #e83e8c;
+        }
+        [data-theme="cyan"] {
+            --bg-color: #e0f7fa;
+            --text-color: #005257;
+            --card-bg: #b2ebf2;
+            --primary-color: #00acc1;
+        }
         body {
-            background-color: {{ background_color | default('#3A4A3A') }} !important;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Noto Sans JP', 'Roboto', sans-serif;
         }
-        .navbar {
-            background-color: {{ navbar_color | default('#4A5A4A') }} !important;
+        .card, .modal-content, .table {
+            background-color: var(--card-bg);
+            color: var(--text-color);
         }
-        .card {
-            background-color: {{ navbar_color | default('#4A5A4A') }} !important;
+        .navbar, .navbar .navbar-brand, .navbar .nav-link {
+            background-color: var(--card-bg) !important;
+            color: var(--text-color) !important;
         }
-        .btn-secondary {
-            background-color: {{ navbar_color | default('#4A5A4A') }} !important;
+        .btn-primary, .btn-success {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #fff;
         }
-        .btn-primary {
-            background-color: {{ navbar_color | default('#4A5A4A') }} !important;
+        .btn-primary:hover, .btn-success:hover {
+            opacity: 0.85;
         }
-        .btn-success {
-            background-color: {{ navbar_color | default('#4A5A4A') }} !important;
-            /* Add this to prevent text wrapping */
-            white-space: nowrap;
+        .alert-info {
+            background-color: var(--card-bg);
+            border-color: var(--primary-color);
+            color: var(--text-color);
         }
-        .color-picker-form {
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+        @media (max-width: 768px) {
+            .blockquote { font-size: 1em; }
+            .btn { padding: 0.375rem 0.75rem; }
+            .d-flex.gap-2 { flex-direction: column; gap: 0.5rem !important; }
+            .btn-sm.w-100 { max-width: none; }
+            .modal-dialog { margin: 1rem; }
         }
-        .color-picker-form input[type="color"] {
-            width: 100%;
-            height: 40px;
-        }
-        .color-picker-form .form-control {
-            background-color: #4A5A4A;
-            border-color: #6A806A;
-            color: #F0F5F0;
-        }
-        .color-picker-form .form-control::placeholder {
-            color: #B8D0B8;
-        }
-        .color-picker-form .btn {
-            width: 100%;
-            margin-top: 5px;
-        }
-        .dropdown-menu-center {
-            position: fixed !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-            min-width: 250px;
-            z-index: 1050;
-        }
-        .dropdown-toggle::after {
-            display: none !important;
+        @media (max-width: 576px) {
+            .table-responsive { font-size: 0.875rem; }
+            .modal-content { font-size: 0.875rem; }
         }
     </style>
+    {% block head %}{% endblock %}
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('quotes') }}">Tomo Quotes</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                    data-bs-target="#navbarNav" aria-controls="navbarNav"
-                    aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <div class="navbar-nav ms-auto">
-                    <a class="nav-link" href="{{ url_for('manage') }}">Tạo Trích Dẫn</a>
-                    <a class="nav-link" href="{{ url_for('quotes') }}">Xem Trích Dẫn</a>
-                    <div class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="colorDropdown" role="button"
-                           data-bs-toggle="dropdown" aria-expanded="false">
-                            Màu Nền
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-center" aria-labelledby="colorDropdown">
-                            <li>
-                                <div class="color-picker-form">
-                                    <label for="backgroundColorPicker">Màu nền trang:</label>
-                                    <input type="color" id="backgroundColorPicker" value="{{ background_color | default('#3A4A3A') }}">
-                                    <label for="navbarColorPicker">Màu thanh điều hướng:</label>
-                                    <input type="color" id="navbarColorPicker" value="{{ navbar_color | default('#4A5A4A') }}">
-                                    <button class="btn btn-primary" id="applyColorBtn">Áp dụng màu mới</button>
-                                    <button class="btn btn-secondary" id="resetColorBtn">Trở về mặc định</button>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+<nav class="navbar navbar-expand-lg navbar-light" style="background-color: var(--card-bg);">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">Quotes</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('quotes') }}">View Quote</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('manage_quotes') }}">List Quote</a></li>
+                </li>
+            </ul>
         </div>
-    </nav>
-    <div class="container my-4">
-        {% block content %}{% endblock %}
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const backgroundColorPicker = document.getElementById('backgroundColorPicker');
-            const navbarColorPicker = document.getElementById('navbarColorPicker');
-            const applyColorBtn = document.getElementById('applyColorBtn');
-            const resetColorBtn = document.getElementById('resetColorBtn');
-
-            // Xử lý nút "Áp dụng màu mới"
-            applyColorBtn.addEventListener('click', function() {
-                const backgroundColor = backgroundColorPicker.value;
-                const navbarColor = navbarColorPicker.value;
-
-                // Cập nhật giao diện ngay lập tức
-                document.body.style.backgroundColor = backgroundColor;
-                document.querySelector('.navbar').style.backgroundColor = navbarColor;
-
-                // Kiểm tra và cập nhật .card nếu tồn tại
-                const cardElement = document.querySelector('.card');
-                if (cardElement) {
-                    cardElement.style.backgroundColor = navbarColor;
+</nav>
+<div class="container mt-4">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            document.querySelectorAll('.alert').forEach(function(alert) {
+                if (typeof bootstrap !== 'undefined' && bootstrap.Alert) {
+                    var bsAlert = bootstrap.Alert.getOrCreateInstance(alert);
+                    bsAlert.close();
+                } else {
+                    alert.remove();
                 }
-
-                // Kiểm tra và cập nhật .btn-secondary nếu tồn tại
-                const btnSecondary = document.querySelector('.btn-secondary');
-                if (btnSecondary) {
-                    btnSecondary.style.backgroundColor = navbarColor;
-                }
-
-                // Kiểm tra và cập nhật .btn-primary nếu tồn tại
-                const btnPrimary = document.querySelector('.btn-primary');
-                if (btnPrimary) {
-                    btnPrimary.style.backgroundColor = navbarColor;
-                }
-
-                // Kiểm tra và cập nhật .btn-success nếu tồn tại
-                const btnSuccess = document.querySelector('.btn-success');
-                if (btnSuccess) {
-                    btnSuccess.style.backgroundColor = navbarColor;
-                }
-
-                // Gửi màu đến backend qua AJAX
-                fetch('{{ url_for('set_color') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'background_color=' + encodeURIComponent(backgroundColor) +
-                          '&navbar_color=' + encodeURIComponent(navbarColor)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Colors saved successfully:', { backgroundColor, navbarColor });
-                        location.reload(); // Reload trang để áp dụng màu từ server
-                    } else {
-                        console.error('Error saving colors:', data.message);
-                        // Hoàn nguyên màu nếu lưu thất bại
-                        document.body.style.backgroundColor = '{{ background_color | default('#3A4A3A') }}';
-                        document.querySelector('.navbar').style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-
-                        if (cardElement) {
-                            cardElement.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnSecondary) {
-                            btnSecondary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnPrimary) {
-                            btnPrimary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnSuccess) {
-                            btnSuccess.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        alert(data.message || 'Lỗi khi lưu màu!');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    // Hoàn nguyên màu nếu có lỗi mạng
-                    document.body.style.backgroundColor = '{{ background_color | default('#3A4A3A') }}';
-                    document.querySelector('.navbar').style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-
-                    if (cardElement) {
-                        cardElement.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnSecondary) {
-                        btnSecondary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnPrimary) {
-                        btnPrimary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnSuccess) {
-                        btnSuccess.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    alert('Lỗi khi lưu màu: ' + error.message);
-                });
             });
-
-            // Xử lý nút "Trở về mặc định"
-            resetColorBtn.addEventListener('click', function() {
-                const defaultBackgroundColor = '#3A4A3A';
-                const defaultNavbarColor = '#4A5A4A';
-
-                // Cập nhật giao diện ngay lập tức
-                document.body.style.backgroundColor = defaultBackgroundColor;
-                document.querySelector('.navbar').style.backgroundColor = defaultNavbarColor;
-
-                // Kiểm tra và cập nhật .card nếu tồn tại
-                const cardElement = document.querySelector('.card');
-                if (cardElement) {
-                    cardElement.style.backgroundColor = defaultNavbarColor;
-                }
-
-                // Kiểm tra và cập nhật .btn-secondary nếu tồn tại
-                const btnSecondary = document.querySelector('.btn-secondary');
-                if (btnSecondary) {
-                    btnSecondary.style.backgroundColor = defaultNavbarColor;
-                }
-
-                // Kiểm tra và cập nhật .btn-primary nếu tồn tại
-                const btnPrimary = document.querySelector('.btn-primary');
-                if (btnPrimary) {
-                    btnPrimary.style.backgroundColor = defaultNavbarColor;
-                }
-
-                // Kiểm tra và cập nhật .btn-success nếu tồn tại
-                const btnSuccess = document.querySelector('.btn-success');
-                if (btnSuccess) {
-                    btnSuccess.style.backgroundColor = defaultNavbarColor;
-                }
-
-                // Gửi yêu cầu đặt lại màu mặc định qua AJAX
-                fetch('{{ url_for('set_color') }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'background_color=' + encodeURIComponent(defaultBackgroundColor) +
-                          '&navbar_color=' + encodeURIComponent(defaultNavbarColor)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Colors reset to default successfully');
-                        location.reload(); // Reload trang để áp dụng màu mặc định từ server
-                    } else {
-                        console.error('Error resetting colors:', data.message);
-                        // Hoàn nguyên màu nếu lưu thất bại
-                        document.body.style.backgroundColor = '{{ background_color | default('#3A4A3A') }}';
-                        document.querySelector('.navbar').style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-
-                        if (cardElement) {
-                            cardElement.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnSecondary) {
-                            btnSecondary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnPrimary) {
-                            btnPrimary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        if (btnSuccess) {
-                            btnSuccess.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                        }
-                        alert(data.message || 'Lỗi khi đặt lại màu mặc định!');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    // Hoàn nguyên màu nếu có lỗi mạng
-                    document.body.style.backgroundColor = '{{ background_color | default('#3A4A3A') }}';
-                    document.querySelector('.navbar').style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-
-                    if (cardElement) {
-                        cardElement.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnSecondary) {
-                        btnSecondary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnPrimary) {
-                        btnPrimary.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    if (btnSuccess) {
-                        btnSuccess.style.backgroundColor = '{{ navbar_color | default('#4A5A4A') }}';
-                    }
-                    alert('Lỗi khi đặt lại màu mặc định: ' + error.message);
-                });
-            });
-        });
-    </script>
+        }, 3000);
+    });
+</script>
+{% endblock %}
 </body>
 </html>

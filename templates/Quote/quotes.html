@@ -1,13 +1,13 @@
-{% extends "base.html" %}
+{% extends "Quote/base.html" %}
 {% block content %}
     <h2 class="mb-3"></h2>
 
-    {% if quote %}
+   {% if quote %}
     <div class="card mb-4">
         <div class="card-body">
             <blockquote class="blockquote mb-0">
-                <p>{{ quote[1] | nl2br | safe }}</p>
-                <footer class="blockquote-footer">{{ quote[2] }}</footer>
+                <p>{{ quote.content | nl2br | safe }}</p>
+                <footer class="blockquote-footer">{{ quote.category.name }}</footer>
             </blockquote>
         </div>
     </div>
@@ -27,8 +27,8 @@
                 <select name="category" class="form-select">
                     <option value="">Chọn Nguồn</option>
                     {% for category in categories %}
-                    <option value="{{ category }}" {% if category == selected_category %}selected{% endif %}>
-                        {{ category }}
+                    <option value="{{ category.name }}" {% if category.name == selected_category %}selected{% endif %}>
+                        {{ category.name }}
                     </option>
                     {% endfor %}
                 </select>

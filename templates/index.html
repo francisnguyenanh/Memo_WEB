@@ -288,6 +288,16 @@
                             <li><a class="dropdown-item" href="{{ url_for('diary_grid') }}">Diary Grid</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="diaryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Quote
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="quoteDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('quotes') }}">View Quote</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('manage_quotes') }}">List Quote</a></li>
+                        </ul>
+                    </li>
+
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
                     </li>

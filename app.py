@@ -22,13 +22,32 @@ from wand.image import Image
 import io
 import threading
 import unicodedata
-
+import sqlite3
+import random
+from markupsafe import Markup
+import difflib
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///memo.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# Diary app setup
+diary_app = Flask(__name__)
+diary_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///diary.db'
+diary_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db_diary = SQLAlchemy()
+db_diary.init_app(diary_app)
+
+# Quote app setup
+quote_app = Flask(__name__)
+quote_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///quotes.db'
+quote_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db_quote = SQLAlchemy()
+db_quote.init_app(quote_app)
+
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
@@ -61,12 +80,6 @@ class Note(db.Model):
     images = db.Column(db.Text, nullable=True)  # Lưu JSON chứa danh sách ảnh (base64)
     category = db.relationship('Category', backref='notes')
 
-# Diary app setup
-diary_app = Flask(__name__)
-diary_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///diary.db'
-diary_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db_diary = SQLAlchemy()
-db_diary.init_app(diary_app)
 
 class Diary(db_diary.Model):
     id = db_diary.Column(db_diary.Integer, primary_key=True)
@@ -79,6 +92,17 @@ class Slogan(db_diary.Model):
     id = db_diary.Column(db_diary.Integer, primary_key=True)
     text = db_diary.Column(db_diary.String(200), nullable=False)
 
+# Quote Category model
+class QuoteCategory(db_quote.Model):
+    id = db_quote.Column(db_quote.Integer, primary_key=True)
+    name = db_quote.Column(db_quote.String(100), nullable=False, unique=True)
+    quotes = db_quote.relationship('Quote', backref='category', lazy=True)
+
+class Quote(db_quote.Model):
+    id = db_quote.Column(db_quote.Integer, primary_key=True)
+    content = db_quote.Column(db_quote.Text, nullable=False)
+    category_id = db_quote.Column(db_quote.Integer, db_quote.ForeignKey('quote_category.id'), nullable=False)
+    
 # Khởi tạo DB Diary và slogan mặc định nếu chưa có
 with diary_app.app_context():
     db_diary.create_all()
@@ -87,6 +111,28 @@ with diary_app.app_context():
         db_diary.session.add(default_slogan)
         db_diary.session.commit()
 
+with quote_app.app_context():
+    db_quote.create_all()
+    # Thêm category mẫu nếu chưa có
+    if not QuoteCategory.query.first():
+        db_quote.session.add(QuoteCategory(name="General"))
+        db_quote.session.commit()
+
+# Initialize database and user.txt
+with app.app_context():
+    db.create_all()
+    # Add default categories if not exist
+    for name, color in [('Work', '#FF9999'), ('Personal', '#99FF99'), ('Ideas', '#9999FF')]:
+        if not Category.query.filter_by(name=name, user_id='default').first():
+            db.session.add(Category(name=name, user_id='default', color=color))
+    db.session.commit()
+    # Initialize user.txt with default password '1234' if not exist
+    if not os.path.exists('user.txt'):
+        default_password = '1234'
+        hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
+        with open('user.txt', 'w') as f:
+            f.write(hashed.decode('utf-8'))
+            
 def get_user_info():
     try:
         with open('userinfor.txt', 'r', encoding='utf-8') as f:
@@ -102,6 +148,14 @@ def get_user_info():
     except Exception:
         return 'Unknown', None
 
+
+def nl2br(value):
+    return Markup(value.replace('\n', '<br>'))
+
+app.jinja_env.filters['nl2br'] = nl2br
+quote_app.jinja_env.filters['nl2br'] = nl2br
+
+    
 @app.route('/set_theme', methods=['POST'])
 def set_theme():
     theme = request.json.get('theme')
@@ -123,20 +177,7 @@ def verify_password(password):
         hash = f.read().strip()
         return bcrypt.checkpw(password.encode('utf-8'), hash.encode('utf-8'))
 
-# Initialize database and user.txt
-with app.app_context():
-    db.create_all()
-    # Add default categories if not exist
-    for name, color in [('Work', '#FF9999'), ('Personal', '#99FF99'), ('Ideas', '#9999FF')]:
-        if not Category.query.filter_by(name=name, user_id='default').first():
-            db.session.add(Category(name=name, user_id='default', color=color))
-    db.session.commit()
-    # Initialize user.txt with default password '1234' if not exist
-    if not os.path.exists('user.txt'):
-        default_password = '1234'
-        hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
-        with open('user.txt', 'w') as f:
-            f.write(hashed.decode('utf-8'))
+
 
 # Register font for Vietnamese support
 try:
@@ -907,6 +948,13 @@ def links():
 
 
 # Diary app routes
+
+@diary_app.context_processor
+def inject_theme_quote():
+    theme = session.get('theme', 'light')
+    return dict(theme=theme)
+
+
 @app.route('/Diary/new', methods=['GET', 'POST'])
 def new_diary():
     if request.method == 'POST':
@@ -994,6 +1042,109 @@ def format_thousands(number):
         return "{:,}".format(int(number))
     except (ValueError, TypeError):
         return number
+
+# Quote app routes
+@quote_app.context_processor
+def inject_theme_quote():
+    theme = session.get('theme', 'light')
+    return dict(theme=theme)
+
+@app.route('/quotes', methods=['GET', 'POST'])
+def quotes():
+    with quote_app.app_context():
+        categories = QuoteCategory.query.order_by(QuoteCategory.name).all()
+        quote = None
+        selected_category = None
+
+        all_quotes = Quote.query.all()
+
+        if request.method == 'POST':
+            if 'category' in request.form and request.form['category']:
+                selected_category = request.form['category']
+                category = QuoteCategory.query.filter_by(name=selected_category).first()
+                quotes_list = Quote.query.filter_by(category=category).all() if category else []
+                if quotes_list:
+                    quote = random.choice(quotes_list)
+            else:
+                if all_quotes:
+                    quote = random.choice(all_quotes)
+
+        if not quote and all_quotes:
+            quote = random.choice(all_quotes)
+
+        return render_template('Quote/quotes.html', quote=quote, categories=categories,
+                               selected_category=selected_category)
+        
+
+@app.route('/quotes/manage', methods=['GET', 'POST'])
+def manage_quotes():
+    with quote_app.app_context():
+        if request.method == 'POST':
+            content = request.form.get('content', '').strip()
+            category_name = request.form.get('category', '').strip()
+            # Kiểm tra trùng lặp
+            existing_quotes = [q.content for q in Quote.query.all()]
+            for existing_content in existing_quotes:
+                similarity = difflib.SequenceMatcher(None, content.lower(), existing_content.lower()).ratio()
+                if similarity >= 0.8:
+                    flash("Trích dẫn này quá giống (≥80%) với một trích dẫn đã tồn tại! Vui lòng nhập trích dẫn khác.", "error")
+                    break
+            else:
+                if content and category_name:
+                    category = QuoteCategory.query.filter_by(name=category_name).first()
+                    if not category:
+                        category = QuoteCategory(name=category_name)
+                        db_quote.session.add(category)
+                        db_quote.session.commit()
+                    db_quote.session.add(Quote(content=content, category=category))
+                    db_quote.session.commit()
+                    flash("Trích dẫn đã được thêm thành công!", "success")
+        quotes = Quote.query.order_by(Quote.content).all()
+        categories = QuoteCategory.query.order_by(QuoteCategory.name).all()
+        category_counts = db_quote.session.query(QuoteCategory, db_quote.func.count(Quote.id)).outerjoin(Quote).group_by(QuoteCategory.id).all()
+        return render_template('Quote/manage_quotes.html', quotes=quotes, categories=categories, category_counts=category_counts)
+
+@app.route('/quotes/edit/<int:id>', methods=['POST'])
+def edit_quote(id):
+    with quote_app.app_context():
+        content = request.form['content']
+        category_name = request.form['category']
+        quote = Quote.query.get_or_404(id)
+        category = QuoteCategory.query.filter_by(name=category_name).first()
+        if not category:
+            category = QuoteCategory(name=category_name)
+            db_quote.session.add(category)
+            db_quote.session.commit()
+        quote.content = content
+        quote.category = category
+        db_quote.session.commit()
+        flash("Trích dẫn đã được sửa thành công!", "success")
+        return redirect(url_for('manage_quotes'))
+
+
+@app.route('/quotes/delete/<int:id>')
+def delete_quote(id):
+    with quote_app.app_context():
+        quote = Quote.query.get_or_404(id)
+        db_quote.session.delete(quote)
+        db_quote.session.commit()
+        flash("Trích dẫn đã được xóa thành công!", "success")
+        return redirect(url_for('manage_quotes'))
+
+@app.route('/quotes/delete_category/<int:category_id>')
+def delete_quote_category(category_id):
+    with quote_app.app_context():
+        category = QuoteCategory.query.get_or_404(category_id)
+        quote_count = Quote.query.filter_by(category=category).count()
+        if quote_count > 0:
+            flash(
+                f"Không thể xóa nguồn '{category.name}' vì đang chứa {quote_count} trích dẫn. Vui lòng xóa hết trích dẫn trong nguồn này trước.",
+                "error")
+        else:
+            db_quote.session.delete(category)
+            db_quote.session.commit()
+            flash(f"Nguồn '{category.name}' đã được xóa thành công.", "success")
+        return redirect(url_for('manage_quotes'))
 
 if __name__ == '__main__':
     app.run(debug=True)
