@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="fs-4 fw-bold text-primary text-uppercase mb-3"><i class="bi bi-pencil-square me-2"></i>New Entry</h2>
+<form method="POST">
+    <div class="mb-3 d-flex align-items-center">
+        <div class="me-3">
+            <label for="color" class="form-label"> </label>
+            <input type="color" class="form-control form-control-color" id="color" name="color" value="#ffffff" list="colorList" required>
+            <datalist id="colorList">
+                <option value="#f8d7da"> <!-- Light Red -->
+                <option value="#d4edda"> <!-- Light Green -->
+                <option value="#cce5ff"> <!-- Light Blue -->
+                <option value="#fff3cd"> <!-- Light Yellow -->
+                <option value="#e2e3e5"> <!-- Light Gray -->
+                <option value="#d1ecf1"> <!-- Light Cyan -->
+                <option value="#fef9e7"> <!-- Light Cream -->
+            </datalist>
+        </div>
+        <div class="flex-grow-1">
+            <label for="title" class="form-label fw-bold text-primary fs-5">Title</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
+    </div>
+    <div class="mb-3">
+        <label for="content" class="form-label fw-bold text-primary fs-5">Content</label>
+        <textarea class="form-control" id="content" name="content" rows="15" required></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Diary</button>
+</form>
+<style>
+    #color {
+        width: 50px;
+        height: 50px;
+        padding: 5px;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper {
+        padding: 0;
+    }
+    input[type="color"]::-webkit-color-swatch {
+        border: none;
+        border-radius: 5px;
+    }
+    .form-label.fw-bold.text-primary.fs-5 {
+        transition: color 0.3s;
+    }
+    .form-label.fw-bold.text-primary.fs-5:hover {
+        color: #005cbf; /* Darker shade of primary */
+    }
+</style>
+<script>
+    const colorInput = document.getElementById('color');
+    const contentArea = document.getElementById('content');
+
+    function calculateContrastColor(hexColor) {
+        hexColor = hexColor.replace('#', '');
+        const r = parseInt(hexColor.substr(0, 2), 16);
+        const g = parseInt(hexColor.substr(2, 2), 16);
+        const b = parseInt(hexColor.substr(4, 2), 16);
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? '#000000' : '#FFFFFF';
+    }
+
+    function updateContentStyle() {
+        const bgColor = colorInput.value;
+        contentArea.style.backgroundColor = bgColor;
+        contentArea.style.color = calculateContrastColor(bgColor);
+    }
+
+    colorInput.addEventListener('input', updateContentStyle);
+    updateContentStyle();
+</script>
+{% endblock %}

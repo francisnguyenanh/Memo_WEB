@@ -200,6 +200,39 @@
             margin-right: 10px;
             margin-bottom: 10px;
         }
+        .fc-event-title {
+            white-space: normal !important;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            line-height: 1.2;
+            font-size: 1em;
+            max-height: 3.6em; /* Hiển thị tối đa 3 dòng, có thể điều chỉnh */
+            overflow: hidden;
+            padding-right: 2px;
+            padding-left: 2px;
+        }
+        .fc-event {
+            overflow: hidden;
+        }
+        /* Ngăn tràn và chỉ hiển thị title trong mọi chế độ */
+        .fc-event-title, .fc-event-main {
+            white-space: normal !important;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            line-height: 1.2;
+            font-size: 1em;
+            max-height: 3.6em; /* hoặc điều chỉnh số dòng tối đa */
+            overflow: hidden;
+            padding-right: 2px;
+            padding-left: 2px;
+            display: block;
+        }
+
+        /* Đảm bảo event không tràn ra ngoài ô */
+        .fc-event, .fc-daygrid-event, .fc-timegrid-event {
+            overflow: hidden !important;
+            max-width: 100%;
+        }
     </style>
 </head>
 <body>
@@ -211,18 +244,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="{{ url_for('calendar') }}">Calendar</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal">Categories</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-                    </li>
+                    
                 </ul>
             </div>
         </div>

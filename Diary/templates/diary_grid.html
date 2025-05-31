@@ -1,0 +1,66 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="fs-4 fw-bold text-primary text-uppercase mb-3"><i class="bi bi-grid me-2"></i>Grid View</h2>
+<div class="diary-grid">
+    {% for diary in diaries %}
+        <a href="{{ url_for('edit_diary', id=diary.id) }}" class="diary-tile" style="background-color: {{ diary.color }}"></a>
+    {% endfor %}
+</div>
+<style>
+    .diary-grid {
+        display: grid;
+        gap: 5px;
+        padding: 10px;
+        height: calc(100vh - 150px);
+        box-sizing: border-box;
+    }
+    .diary-tile {
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    @media (max-width: 576px) {
+        .diary-grid {
+            gap: 3px;
+            padding: 5px;
+            height: calc(100vh - 120px);
+        }
+    }
+</style>
+<script>
+    function adjustGrid() {
+        const grid = document.querySelector('.diary-grid');
+        const tiles = document.querySelectorAll('.diary-tile');
+        const count = tiles.length;
+        if (count === 0) return;
+
+        const vw = window.innerWidth;
+        const vh = grid.clientHeight;
+        const sqrt = Math.ceil(Math.sqrt(count));
+        const cols = sqrt;
+        let rows = Math.ceil(count / cols);
+
+        const tileWidth = (vw - (cols - 1) * 5 - 20) / cols;
+        const tileHeight = (vh - (rows - 1) * 5 - 20) / rows;
+        const tileSize = Math.min(tileWidth, tileHeight);
+
+        if (tileSize * rows < vh && count > cols) {
+            rows = Math.floor(vh / tileSize);
+            if (rows * cols < count) rows++;
+        }
+
+        grid.style.gridTemplateColumns = `repeat(${cols}, ${tileSize}px)`;
+        grid.style.gridTemplateRows = `repeat(${rows}, ${tileSize}px)`;
+        tiles.forEach(tile => {
+            tile.style.width = `${tileSize}px`;
+            tile.style.height = `${tileSize}px`;
+        });
+
+        grid.style.display = 'grid';
+        grid.style.justifyContent = 'center';
+        grid.style.alignContent = 'center';
+    }
+
+    window.addEventListener('load', adjustGrid);
+    window.addEventListener('resize', adjustGrid);
+</script>
+{% endblock %}
