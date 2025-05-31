@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="{{ theme|default('light') }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -259,17 +259,34 @@
     <!-- HTML remains unchanged -->
     <nav class="navbar navbar-expand-lg navbar-light" style="background-color: var(--card-bg);">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">Tomo Memo</a>
+            <a class="navbar-brand" href="/">Tomobe Eiki</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('calendar') }}">Calendar</a>
+                    <!-- Memo dropdown menu -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="memoDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Memo
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="memoDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('index') }}">Memo List</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('calendar') }}">Calendar</a></li>
+                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal">Category</a></li>
+                        </ul>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal">Categories</a>
+                    
+                    <!-- filepath: /Users/eikitomobe/Documents/3. Học tập/Lập trình/VS code/Memo_WEB/templates/index.html -->
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="diaryDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Diary
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="diaryDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('new_diary') }}">New Diary</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('diary_list') }}">Diary List</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('diary_grid') }}">Diary Grid</a></li>
+                        </ul>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#settingsModal">Settings</a>
@@ -634,13 +651,19 @@
         const editMemoForm = document.getElementById('editMemoForm');
 
         const themeSelect = document.getElementById('themeSelect');
-        const currentTheme = localStorage.getItem('theme') || 'light';
+        const currentTheme = localStorage.getItem('theme') || '{{ session.get("theme", "light") }}';
         document.documentElement.setAttribute('data-theme', currentTheme);
         themeSelect.value = currentTheme;
         themeSelect.addEventListener('change', () => {
             const theme = themeSelect.value;
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('theme', theme);
+            // Gửi theme lên server để lưu vào session
+            fetch('/set_theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({theme: theme})
+            });
         });
 
         const searchInput = document.getElementById('searchInput');

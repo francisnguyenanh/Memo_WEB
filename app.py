@@ -1,6 +1,6 @@
 import base64
 
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file, Response, jsonify
+from flask import Flask, render_template, request, redirect, session, url_for, flash, send_file, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 import bcrypt
@@ -12,7 +12,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 import uuid
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from datetime import datetime, timedelta  # Added timedelta
 from uuid import uuid4  # Added uuid4
 from base64 import b64encode
@@ -61,6 +61,56 @@ class Note(db.Model):
     images = db.Column(db.Text, nullable=True)  # Lưu JSON chứa danh sách ảnh (base64)
     category = db.relationship('Category', backref='notes')
 
+# Diary app setup
+diary_app = Flask(__name__)
+diary_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///diary.db'
+diary_app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db_diary = SQLAlchemy()
+db_diary.init_app(diary_app)
+
+class Diary(db_diary.Model):
+    id = db_diary.Column(db_diary.Integer, primary_key=True)
+    title = db_diary.Column(db_diary.String(100), nullable=False)
+    content = db_diary.Column(db_diary.Text, nullable=False)
+    date = db_diary.Column(db_diary.DateTime, nullable=False, default=datetime.utcnow)
+    color = db_diary.Column(db_diary.String(7), nullable=False)
+
+class Slogan(db_diary.Model):
+    id = db_diary.Column(db_diary.Integer, primary_key=True)
+    text = db_diary.Column(db_diary.String(200), nullable=False)
+
+# Khởi tạo DB Diary và slogan mặc định nếu chưa có
+with diary_app.app_context():
+    db_diary.create_all()
+    if not Slogan.query.first():
+        default_slogan = Slogan(text="Write your story, live your journey.")
+        db_diary.session.add(default_slogan)
+        db_diary.session.commit()
+
+def get_user_info():
+    try:
+        with open('userinfor.txt', 'r', encoding='utf-8') as f:
+            lines = f.read().splitlines()
+            birthday = None
+            name = None
+            for line in lines:
+                if line.startswith('Birthday:'):
+                    birthday = line.replace('Birthday:', '').strip().replace('/', '-')
+                elif line.startswith('Name:'):
+                    name = line.replace('Name:', '').strip()
+            return name or 'Unknown', birthday
+    except Exception:
+        return 'Unknown', None
+
+@app.route('/set_theme', methods=['POST'])
+def set_theme():
+    theme = request.json.get('theme')
+    if theme:
+        session['theme'] = theme
+        return jsonify({'status': 'success'})
+    return jsonify({'status': 'error', 'message': 'No theme provided'}), 400
+
+    
 @login_manager.user_loader
 def load_user(user_id):
     return User() if user_id == 'default' else None
@@ -854,6 +904,96 @@ def links():
     except Exception as e:
         app.logger.error(f"Error reading link.txt: {e}")
     return jsonify({'links': links})
+
+
+# Diary app routes
+@app.route('/Diary/new', methods=['GET', 'POST'])
+def new_diary():
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        color = request.form['color']
+        with diary_app.app_context():
+            diary = Diary(title=title, content=content, color=color)
+            db_diary.session.add(diary)
+            db_diary.session.commit()
+        flash('Diary entry saved!', 'success')
+        return redirect(url_for('diary_list'))
+    return render_template('Diary/new_diary.html')
+
+@app.route('/Diary/edit/<int:id>', methods=['GET', 'POST'])
+def edit_diary(id):
+    with diary_app.app_context():
+        diary = Diary.query.get_or_404(id)
+        if request.method == 'POST':
+            diary.title = request.form['title']
+            diary.content = request.form['content']
+            diary.color = request.form['color']
+            db_diary.session.commit()
+            flash('Diary entry updated!', 'success')
+            return redirect(url_for('diary_grid'))
+    return render_template('Diary/edit_diary.html', diary=diary)
+
+@app.route('/Diary/grid')
+def diary_grid():
+    with diary_app.app_context():
+        diaries = Diary.query.all()
+    return render_template('Diary/diary_grid.html', diaries=diaries)
+
+@app.route('/Diary/list')
+def diary_list():
+    with diary_app.app_context():
+        diaries = Diary.query.order_by(Diary.date.desc()).all()
+    return render_template('Diary/diary_list.html', diaries=diaries)
+
+@app.route('/change_slogan', methods=['POST'])
+def change_slogan():
+    new_slogan_text = request.form['new_slogan']
+    if not new_slogan_text or len(new_slogan_text) > 200:
+        flash('Slogan must be between 1 and 200 characters.', 'danger')
+        return redirect(request.referrer or url_for('Diary/diary_grid'))
+    with diary_app.app_context():
+        slogan = Slogan.query.first()
+        if slogan:
+            slogan.text = new_slogan_text
+        else:
+            slogan = Slogan(text=new_slogan_text)
+            db_diary.session.add(slogan)
+        db_diary.session.commit()
+    flash('Slogan updated successfully!', 'success')
+    return redirect(request.referrer or url_for('Diary/diary_grid'))
+
+@app.context_processor
+def inject_theme():
+    # Theme lấy từ session hoặc mặc định
+    theme = session.get('theme', 'light')
+    print(theme)
+    username, birthday = get_user_info()
+    days_alive = 0
+    if birthday:
+        try:
+            dob = datetime.strptime(birthday, '%Y-%m-%d').date()
+            days_alive = (date.today() - dob).days
+        except Exception:
+            pass
+    # Lấy slogan từ DB diary
+    with diary_app.app_context():
+        slogan = Slogan.query.first()
+        slogan_text = slogan.text if slogan else "Write your story, live your journey."
+    return dict(
+        theme=theme,
+        username=username,
+        days_alive=days_alive,
+        slogan=slogan_text
+    )
+
+# Custom Jinja2 filter to format numbers with thousands separators
+@app.template_filter('format_thousands')
+def format_thousands(number):
+    try:
+        return "{:,}".format(int(number))
+    except (ValueError, TypeError):
+        return number
 
 if __name__ == '__main__':
     app.run(debug=True)
