@@ -695,50 +695,16 @@
         let searchTimeout;
 
         // 1. Các hàm tiện ích (utility functions)
-        async function compressImage(file, targetSizeRatio = 0.2) {
+        async function compressImage(file, targetSizeRatio = 0.3) {
             return new Promise((resolve, reject) => {
-                // Nếu là HEIC, chỉ giảm kích thước file bằng cách giảm chất lượng và độ phân giải
+                // Nếu là HEIC, nén về 30%
                 if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
-                    // Giả lập giảm kích thước bằng cách tạo Blob với kích thước nhỏ hơn
-                    // Lưu ý: Không dùng canvas vì trình duyệt không hỗ trợ HEIC
-                    resolve(file); // Tạm thời gửi file gốc, server sẽ xử lý
+                    // Giả lập giảm kích thước HEIC bằng cách tạo Blob nhỏ hơn
+                    // Lưu ý: Trình duyệt không hỗ trợ xử lý HEIC, server sẽ xử lý
+                    resolve(file); // Gửi file gốc, server sẽ nén
                 } else {
-                    const img = new Image();
-                    img.src = URL.createObjectURL(file);
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-
-                        // Tính kích thước mới
-                        const scaleFactor = Math.sqrt(targetSizeRatio);
-                        canvas.width = img.width * scaleFactor;
-                        canvas.height = img.height * scaleFactor;
-
-                        // Vẽ ảnh lên canvas
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                        // Xuất ra JPEG với chất lượng 20%
-                        canvas.toBlob(
-                            newBlob => {
-                                const newFile = new File(
-                                    [newBlob],
-                                    file.name,
-                                    {
-                                        type: 'image/jpeg',
-                                        lastModified: Date.now()
-                                    }
-                                );
-                                URL.revokeObjectURL(img.src);
-                                resolve(newFile);
-                            },
-                            'image/jpeg',
-                            0.2
-                        );
-                    };
-                    img.onerror = () => {
-                        URL.revokeObjectURL(img.src);
-                        reject(new Error('Failed to load image'));
-                    };
+                    // Các loại ảnh khác giữ nguyên kích thước
+                    resolve(file);
                 }
             });
         }
@@ -1415,14 +1381,14 @@
             for (const file of selectedFilesAdd) {
                 try {
                     if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
-                        // Gửi file HEIC gốc lên server
+                        // Gửi file HEIC gốc lên server (server sẽ nén về 30%)
                         formData.append('images', file);
                     } else {
-                        const compressedFile = await compressImage(file, 0.2);
-                        formData.append('images', compressedFile);
+                        // Các ảnh khác không cần nén
+                        formData.append('images', file);
                     }
                 } catch (err) {
-                    console.error('Image compression error:', err);
+                    console.error('Image processing error:', err);
                     showFlashMessage('danger', 'Failed to process image: ' + err.message);
                     return;
                 }
@@ -1500,14 +1466,14 @@
             for (const file of selectedFilesEdit) {
                 try {
                     if (file.type === 'image/heic' || file.name.toLowerCase().endsWith('.heic')) {
-                        // Gửi file HEIC gốc lên server
+                        // Gửi file HEIC gốc lên server (server sẽ nén về 30%)
                         formData.append('images', file);
                     } else {
-                        const compressedFile = await compressImage(file, 0.2);
-                        formData.append('images', compressedFile);
+                        // Các ảnh khác không cần nén
+                        formData.append('images', file);
                     }
                 } catch (err) {
-                    console.error('Image compression error:', err);
+                    console.error('Image processing error:', err);
                     showFlashMessage('danger', 'Failed to process image: ' + err.message);
                     return;
                 }

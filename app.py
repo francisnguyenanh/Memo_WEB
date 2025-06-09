@@ -329,7 +329,7 @@ def add_note():
                                     if ext == '.heic':
                                         with Image(file=file) as img:
                                             img.format = 'jpeg'
-                                            img.compression_quality = 20
+                                            img.compression_quality = 30  # Giảm về 30%
                                             output = io.BytesIO()
                                             img.save(file=output)
                                             image_data = output.getvalue()
@@ -487,7 +487,7 @@ def edit_note(id):
                                     if ext == '.heic':
                                         with Image(file=file) as img:
                                             img.format = 'jpeg'
-                                            img.compression_quality = 20
+                                            img.compression_quality = 30  # Giảm về 30%
                                             output = io.BytesIO()
                                             img.save(file=output)
                                             image_data = output.getvalue()
