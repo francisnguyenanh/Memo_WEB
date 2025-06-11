@@ -92,6 +92,15 @@ class Slogan(db_diary.Model):
     id = db_diary.Column(db_diary.Integer, primary_key=True)
     text = db_diary.Column(db_diary.String(200), nullable=False)
 
+
+# Thêm vào sau class Slogan trong app.py
+class EditorDocument(db_diary.Model):
+    id = db_diary.Column(db_diary.Integer, primary_key=True)
+    title = db_diary.Column(db_diary.String(200), nullable=False)
+    content = db_diary.Column(db_diary.Text, nullable=False)
+    created_at = db_diary.Column(db_diary.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db_diary.Column(db_diary.DateTime, nullable=False, default=datetime.utcnow)
+    
 # Quote Category model
 class QuoteCategory(db_quote.Model):
     id = db_quote.Column(db_quote.Integer, primary_key=True)
@@ -132,7 +141,32 @@ with app.app_context():
         hashed = bcrypt.hashpw(default_password.encode('utf-8'), bcrypt.gensalt())
         with open('user.txt', 'w') as f:
             f.write(hashed.decode('utf-8'))
-            
+
+# Thêm vào phần diary app setup (sau dòng db_diary.init_app(diary_app))
+@diary_app.template_filter('format_thousands')
+def format_thousands_diary(value):
+    """Format number with thousands separator"""
+    try:
+        return f"{int(value):,}"
+    except (ValueError, TypeError):
+        return value
+
+@diary_app.template_filter('nl2br')
+def nl2br_filter_diary(text):
+    """Convert newlines to <br> tags"""
+    if text is None:
+        return ''
+    return text.replace('\n', '<br>')
+
+@diary_app.template_filter('truncate')
+def truncate_filter_diary(text, length=100):
+    """Truncate text to specified length"""
+    if text is None:
+        return ''
+    if len(text) <= length:
+        return text
+    return text[:length] + '...'
+
 def get_user_info():
     try:
         with open('userinfor.txt', 'r', encoding='utf-8') as f:
@@ -1145,6 +1179,51 @@ def delete_quote_category(category_id):
             db_quote.session.commit()
             flash(f"Nguồn '{category.name}' đã được xóa thành công.", "success")
         return redirect(url_for('manage_quotes'))
+
+# Thêm vào app.py sau các route diary
+@app.route('/editor', methods=['GET', 'POST'])
+def editor():
+    with diary_app.app_context():
+        if request.method == 'POST':
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            if title and content:
+                doc = EditorDocument(title=title, content=content)
+                db_diary.session.add(doc)
+                db_diary.session.commit()
+                flash('Document saved successfully!', 'success')
+                return redirect(url_for('editor_list'))
+            else:
+                flash('Title and content are required!', 'danger')
+        return render_template('Diary/editor.html')
+
+@app.route('/editor/list')
+def editor_list():
+    with diary_app.app_context():
+        documents = EditorDocument.query.order_by(EditorDocument.updated_at.desc()).all()
+    return render_template('Diary/editor_list.html', documents=documents)
+
+@app.route('/editor/edit/<int:id>', methods=['GET', 'POST'])
+def edit_editor_document(id):
+    with diary_app.app_context():
+        doc = EditorDocument.query.get_or_404(id)
+        if request.method == 'POST':
+            doc.title = request.form.get('title', '').strip()
+            doc.content = request.form.get('content', '').strip()
+            doc.updated_at = datetime.utcnow()
+            db_diary.session.commit()
+            flash('Document updated successfully!', 'success')
+            return redirect(url_for('editor_list'))
+    return render_template('Diary/editor.html', document=doc)
+
+@app.route('/editor/delete/<int:id>')
+def delete_editor_document(id):
+    with diary_app.app_context():
+        doc = EditorDocument.query.get_or_404(id)
+        db_diary.session.delete(doc)
+        db_diary.session.commit()
+        flash('Document deleted successfully!', 'success')
+    return redirect(url_for('editor_list'))
 
 if __name__ == '__main__':
     app.run(debug=True)
